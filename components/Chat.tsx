@@ -2,11 +2,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { getChatReply } from '../services/geminiService';
 import { saveFlashcard, isFlashcardSaved } from '../services/flashcardService';
-import { ChatMessage, Flashcard } from '../types';
+import { ChatMessage, Flashcard, SavedEntry } from '../types';
 import { SendIcon } from './icons/SendIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
 
-const Chat: React.FC = () => {
+interface ChatProps {
+  savedEntries: SavedEntry[];
+}
+
+const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'model', parts: [{ text: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' }], response: { reply: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' } }
   ]);
@@ -14,6 +18,7 @@ const Chat: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [savedCards, setSavedCards] = useState<Set<string>>(new Set());
+  const [selectedEntry, setSelectedEntry] = useState<SavedEntry | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,12 +85,82 @@ const Chat: React.FC = () => {
     </div>
   );
 
+  const handleImportEntry = (entryId: string) => {
+    const entry = savedEntries.find(e => e.id === entryId);
+    if (entry) {
+      setSelectedEntry(entry);
+      const contextMessage = `Ich möchte über dieses Reisefoto sprechen: ${entry.location}. ${entry.analysisResult.description_de}`;
+      const userMessage: ChatMessage = { 
+        role: 'user', 
+        parts: [{ text: contextMessage }] 
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setLoading(true);
+      setError(null);
+
+      getChatReply([...messages, userMessage])
+        .then(response => {
+          const modelMessage: ChatMessage = { 
+            role: 'model', 
+            parts: [{ text: response.reply }], 
+            response: response 
+          };
+          setMessages(prev => [...prev, modelMessage]);
+        })
+        .catch(err => {
+          console.error(err);
+          setError('Fehler beim Laden des Kontexts.');
+        })
+        .finally(() => setLoading(false));
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md flex flex-col h-[70vh]">
       <div className="p-4 border-b border-slate-200">
         <h2 className="text-xl font-semibold text-slate-800">Spanisch-Lern-Chat</h2>
         <p className="text-sm text-slate-500">Übe dein Spanisch mit deinem persönlichen AI-Tutor</p>
+        
+        {savedEntries.length > 0 && (
+          <div className="mt-3">
+            <label htmlFor="entry-select" className="block text-xs font-medium text-slate-600 mb-1">
+              📸 Reiseeintrag importieren:
+            </label>
+            <select
+              id="entry-select"
+              onChange={(e) => handleImportEntry(e.target.value)}
+              className="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              defaultValue=""
+            >
+              <option value="" disabled>Wähle einen Reiseeintrag...</option>
+              {savedEntries.map(entry => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.location} - {new Date(entry.timestamp).toLocaleDateString('de-DE')}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
+      {selectedEntry && (
+        <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex items-center gap-3">
+          <img 
+            src={selectedEntry.imagePreview} 
+            alt={selectedEntry.location} 
+            className="w-12 h-12 object-cover rounded-md"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-indigo-900 truncate">{selectedEntry.location}</p>
+            <p className="text-xs text-indigo-700">Aktiver Kontext im Chat</p>
+          </div>
+          <button
+            onClick={() => setSelectedEntry(null)}
+            className="text-indigo-600 hover:text-indigo-800 text-xs font-medium"
+          >
+            ✕ Entfernen
+          </button>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, index) => (
           <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>

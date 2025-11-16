@@ -54,7 +54,7 @@ const App: React.FC = () => {
       case 'analyzer':
         return <ImageAnalyzer onSaveEntry={handleSaveEntry} />;
       case 'chat':
-        return <Chat />;
+        return <Chat savedEntries={savedEntries} />;
       case 'diary':
         return <Diary entries={savedEntries} onDeleteEntry={handleDeleteEntry} />;
       case 'flashcards':
