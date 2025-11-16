@@ -4,6 +4,7 @@ import { ImageAnalysisResult, SavedEntry } from '../types';
 import Quiz from './Quiz';
 import { UploadIcon } from './icons/UploadIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
+import { useToast } from '../contexts/ToastContext';
 
 interface ImageAnalyzerProps {
   onSaveEntry: (entryData: Omit<SavedEntry, 'id' | 'timestamp'>) => void;
@@ -17,6 +18,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState<boolean>(false);
+  const toast = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,6 +44,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
       };
       onSaveEntry(entryData);
       setIsSaved(true);
+      toast.success('Reiseeintrag wurde gespeichert! 🎉');
     }
   };
 
@@ -59,7 +62,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
 
   const handleSubmit = useCallback(async () => {
     if (!imageFile || !location) {
-      setError('Bitte wähle ein Bild aus und gib einen Ort an.');
+      toast.warning('Bitte wähle ein Bild aus und gib einen Ort an.');
       return;
     }
 
@@ -72,13 +75,16 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
       const imageData = await fileToGenerativePart(imageFile);
       const analysisResult = await analyzeImage(imageData.inlineData.data, imageData.inlineData.mimeType, location);
       setResult(analysisResult);
+      toast.success('Bildanalyse erfolgreich abgeschlossen! ✨');
     } catch (err) {
       console.error(err);
-      setError('Fehler bei der Analyse des Bildes. Bitte versuche es erneut.');
+      const errorMsg = 'Fehler bei der Analyse des Bildes. Bitte versuche es erneut.';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
-  }, [imageFile, location]);
+  }, [imageFile, location, toast]);
 
   return (
     <div className="space-y-6">

@@ -8,6 +8,7 @@ import { ChatBubbleIcon } from './components/icons/ChatBubbleIcon';
 import { BookOpenIcon } from './components/icons/BookOpenIcon';
 import { CardIcon } from './components/icons/CardIcon';
 import { SavedEntry } from './types';
+import { useToast } from './contexts/ToastContext';
 
 
 type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards';
@@ -15,6 +16,7 @@ type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('analyzer');
   const [savedEntries, setSavedEntries] = useState<SavedEntry[]>([]);
+  const toast = useToast();
 
   useEffect(() => {
     try {
@@ -36,7 +38,6 @@ const App: React.FC = () => {
     const updatedEntries = [newEntry, ...savedEntries];
     setSavedEntries(updatedEntries);
     localStorage.setItem('diaryEntries', JSON.stringify(updatedEntries));
-    alert('Reiseeintrag wurde gespeichert!');
     setActiveTab('diary');
   };
 

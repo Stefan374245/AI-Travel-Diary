@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { SavedEntry } from '../types';
+import { SavedEntry, Flashcard } from '../types';
 import Quiz from './Quiz';
 import { TrashIcon } from './icons/TrashIcon';
+import { saveFlashcard, isFlashcardSaved } from '../services/flashcardService';
+import { useToast } from '../contexts/ToastContext';
 
 interface DiaryProps {
   entries: SavedEntry[];
@@ -10,9 +12,26 @@ interface DiaryProps {
 
 const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry }) => {
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  const toast = useToast();
 
   const toggleExpand = (id: string) => {
     setExpandedEntryId(prevId => (prevId === id ? null : id));
+  };
+
+  const handleAddToFlashcards = (vocab: Flashcard, entry: SavedEntry) => {
+    if (isFlashcardSaved(vocab)) {
+      toast.info('Diese Lernkarte wurde bereits gespeichert!');
+      return;
+    }
+
+    const entryData = {
+      entryId: entry.id,
+      imageUrl: entry.imagePreview,
+      location: entry.location
+    };
+
+    saveFlashcard(vocab, undefined, entryData);
+    toast.success(`"${vocab.es}" wurde zu den Lernkarten hinzugefügt! 🎉`);
   };
 
   if (entries.length === 0) {
@@ -41,7 +60,10 @@ const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry }) => {
               <button
                   onClick={(e) => {
                       e.stopPropagation();
-                      onDeleteEntry(entry.id);
+                      if (window.confirm('Möchtest du diesen Eintrag wirklich löschen?')) {
+                        onDeleteEntry(entry.id);
+                        toast.success('Eintrag wurde gelöscht');
+                      }
                   }}
                   className="p-2 rounded-full hover:bg-red-100 text-slate-400 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                   aria-label="Eintrag löschen"
@@ -71,13 +93,28 @@ const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry }) => {
                             <tr>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Spanisch</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Deutsch</th>
+                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Aktionen</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-200">
                             {entry.analysisResult.vocab.map((v, i) => (
-                                <tr key={i} className="hover:bg-slate-50">
+                                <tr key={i} className="group hover:bg-indigo-50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{v.es}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{v.de}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                        <button
+                                            onClick={() => handleAddToFlashcards(v, entry)}
+                                            disabled={isFlashcardSaved(v)}
+                                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all transform opacity-0 group-hover:opacity-100 ${
+                                                isFlashcardSaved(v)
+                                                    ? 'bg-green-100 text-green-700 cursor-not-allowed'
+                                                    : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105 shadow-md hover:shadow-lg'
+                                            }`}
+                                            title={isFlashcardSaved(v) ? 'Bereits gespeichert' : 'Zu Lernkarten hinzufügen'}
+                                        >
+                                            {isFlashcardSaved(v) ? '✓ Gespeichert' : '+ Lernkarte'}
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

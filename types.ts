@@ -26,13 +26,13 @@ export interface SavedFlashcard extends Flashcard {
   id: string;
   timestamp: string;
   category?: string;
-  box: number; // Leitner Box 1-5 (1 = neu/schwer, 5 = gut gelernt)
-  lastReviewed: string | null; // ISO timestamp der letzten Wiederholung
-  nextReview: string; // ISO timestamp wann Karte wieder fällig ist
-  reviewCount: number; // Wie oft richtig beantwortet
-  entryId?: string; // Verknüpfung zu Reiseeintrag
-  imageUrl?: string; // Bild vom Reiseeintrag
-  location?: string; // Ort vom Reiseeintrag
+  box: number;
+  lastReviewed: string | null;
+  nextReview: string;
+  reviewCount: number;
+  entryId?: string;
+  imageUrl?: string;
+  location?: string;
 }
 
 export interface ChatResponse {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SavedFlashcard } from '../types';
 import { loadFlashcards } from '../services/flashcardService';
+import { useToast } from '../contexts/ToastContext';
 
 const FlashcardQuiz: React.FC = () => {
   const [flashcards, setFlashcards] = useState<SavedFlashcard[]>([]);
@@ -16,6 +17,7 @@ const FlashcardQuiz: React.FC = () => {
     imageUrl?: string;
     location?: string;
   }>>([]);
+  const toast = useToast();
 
   useEffect(() => {
     const cards = loadFlashcards();
@@ -24,7 +26,7 @@ const FlashcardQuiz: React.FC = () => {
 
   const generateQuiz = (numQuestions: number = 10) => {
     if (flashcards.length < 4) {
-      alert('Du brauchst mindestens 4 Lernkarten, um ein Quiz zu starten!');
+      toast.warning('Du brauchst mindestens 4 Lernkarten, um ein Quiz zu starten!');
       return;
     }
 

@@ -3,6 +3,7 @@ import { SavedFlashcard } from '../types';
 import { loadFlashcards, deleteFlashcard, reviewFlashcard, getDueFlashcards, getFlashcardStats } from '../services/flashcardService';
 import { TrashIcon } from './icons/TrashIcon';
 import FlashcardQuiz from './FlashcardQuiz';
+import { useToast } from '../contexts/ToastContext';
 
 type ViewMode = 'browse' | 'study' | 'quiz';
 
@@ -15,6 +16,7 @@ const Flashcards: React.FC = () => {
   const [studyCards, setStudyCards] = useState<SavedFlashcard[]>([]);
   const [slideAnimation, setSlideAnimation] = useState<'slide-out-left' | 'slide-out-right' | 'slide-in' | null>(null);
   const [flippedBrowseCards, setFlippedBrowseCards] = useState<Set<string>>(new Set());
+  const toast = useToast();
 
   useEffect(() => {
     refreshCards();
@@ -73,6 +75,7 @@ const Flashcards: React.FC = () => {
     if (window.confirm('Möchtest du diese Lernkarte wirklich löschen?')) {
       deleteFlashcard(id);
       refreshCards();
+      toast.success('Lernkarte wurde gelöscht');
     }
   };
 
