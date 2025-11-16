@@ -277,7 +277,8 @@ const Flashcards: React.FC = () => {
             <div key={card.id} className="group relative">
               <div 
                 className="perspective-1000 cursor-pointer"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setFlippedBrowseCards(prev => {
                     const newSet = new Set(prev);
                     if (newSet.has(card.id)) {
@@ -290,7 +291,7 @@ const Flashcards: React.FC = () => {
                 }}
               >
                 <div 
-                  className={`relative h-64 rounded-3xl shadow-xl hover:shadow-3xl transition-all duration-700 transform hover:scale-105 hover:-rotate-1 preserve-3d ${
+                  className={`relative h-64 rounded-3xl shadow-xl hover:shadow-3xl transition-all duration-700 preserve-3d ${
                     isCardFlipped ? '[transform:rotateY(180deg)]' : ''
                   }`}
                 >
