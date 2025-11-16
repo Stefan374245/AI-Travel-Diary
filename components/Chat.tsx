@@ -49,12 +49,15 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
   }, [input, loading, messages]);
 
   const handleSaveFlashcard = (flashcard: Flashcard) => {
-    try {
-      saveFlashcard(flashcard);
-      setSavedCards(prev => new Set([...prev, flashcard.es]));
-    } catch (error) {
-      console.error('Fehler beim Speichern der Lernkarte:', error);
-    }
+    // Verwende Kontext vom importierten Reiseeintrag wenn vorhanden
+    const entryData = selectedEntry ? {
+      entryId: selectedEntry.id,
+      imageUrl: selectedEntry.imagePreview,
+      location: selectedEntry.location
+    } : undefined;
+    
+    const savedCard = saveFlashcard(flashcard, undefined, entryData);
+    setSavedCards(prev => new Set([...prev, savedCard.es]));
   };
 
   const FlashcardDisplay: React.FC<{ flashcards: Flashcard[] }> = ({ flashcards }) => (
