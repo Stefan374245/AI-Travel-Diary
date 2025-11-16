@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { getChatReply } from '../services/geminiService';
+import { saveFlashcard, isFlashcardSaved } from '../services/flashcardService';
 import { ChatMessage, Flashcard } from '../types';
 import { SendIcon } from './icons/SendIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
@@ -12,6 +13,7 @@ const Chat: React.FC = () => {
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedCards, setSavedCards] = useState<Set<string>>(new Set());
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,16 +43,39 @@ const Chat: React.FC = () => {
     }
   }, [input, loading, messages]);
 
+  const handleSaveFlashcard = (flashcard: Flashcard) => {
+    try {
+      saveFlashcard(flashcard);
+      setSavedCards(prev => new Set([...prev, flashcard.es]));
+    } catch (error) {
+      console.error('Fehler beim Speichern der Lernkarte:', error);
+    }
+  };
+
   const FlashcardDisplay: React.FC<{ flashcards: Flashcard[] }> = ({ flashcards }) => (
     <div className="mt-3 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
       <h4 className="text-sm font-semibold text-indigo-800 mb-2 flex items-center gap-2"><SparklesIcon /> Vorschläge für Lernkarten</h4>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-        {flashcards.map((card, i) => (
-          <div key={i} className="bg-white p-2 rounded-md shadow-sm">
-            <p className="font-medium text-slate-700">{card.es}</p>
-            <p className="text-slate-500">{card.de}</p>
-          </div>
-        ))}
+        {flashcards.map((card, i) => {
+          const isSaved = savedCards.has(card.es) || isFlashcardSaved(card);
+          return (
+            <div key={i} className="bg-white p-2 rounded-md shadow-sm relative">
+              <p className="font-medium text-slate-700">{card.es}</p>
+              <p className="text-slate-500 mb-2">{card.de}</p>
+              <button
+                onClick={() => handleSaveFlashcard(card)}
+                disabled={isSaved}
+                className={`w-full mt-2 px-2 py-1 text-xs font-medium rounded transition-colors ${
+                  isSaved 
+                    ? 'bg-green-100 text-green-700 cursor-not-allowed' 
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                }`}
+              >
+                {isSaved ? '✓ Gespeichert' : '+ Speichern'}
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

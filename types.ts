@@ -22,6 +22,12 @@ export interface Flashcard {
   de: string;
 }
 
+export interface SavedFlashcard extends Flashcard {
+  id: string;
+  timestamp: string;
+  category?: string;
+}
+
 export interface ChatResponse {
   reply: string;
   suggested_flashcards?: Flashcard[];

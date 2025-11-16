@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import ImageAnalyzer from './components/ImageAnalyzer';
 import Chat from './components/Chat';
 import Diary from './components/Diary';
+import Flashcards from './components/Flashcards';
 import { CameraIcon } from './components/icons/CameraIcon';
 import { ChatBubbleIcon } from './components/icons/ChatBubbleIcon';
 import { BookOpenIcon } from './components/icons/BookOpenIcon';
+import { CardIcon } from './components/icons/CardIcon';
 import { SavedEntry } from './types';
 
 
-type Tab = 'analyzer' | 'chat' | 'diary';
+type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('analyzer');
@@ -55,6 +57,8 @@ const App: React.FC = () => {
         return <Chat />;
       case 'diary':
         return <Diary entries={savedEntries} onDeleteEntry={handleDeleteEntry} />;
+      case 'flashcards':
+        return <Flashcards />;
       default:
         return null;
     }
@@ -91,6 +95,7 @@ const App: React.FC = () => {
             <TabButton tabName="analyzer" label="Reiseeintrag erstellen" icon={<CameraIcon />} />
             <TabButton tabName="diary" label="Mein Tagebuch" icon={<BookOpenIcon />} />
             <TabButton tabName="chat" label="Spanisch-Lern-Chat" icon={<ChatBubbleIcon />} />
+            <TabButton tabName="flashcards" label="Lernkarten" icon={<CardIcon />} />
           </div>
         </div>
 
