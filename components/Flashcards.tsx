@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SavedFlashcard } from '../types';
+import { SavedFlashcard, SavedEntry } from '../types';
 import { loadFlashcards, deleteFlashcard, reviewFlashcard, getDueFlashcards, getFlashcardStats } from '../services/flashcardService';
 import { TrashIcon } from './icons/TrashIcon';
 import FlashcardQuiz from './FlashcardQuiz';
@@ -21,6 +21,22 @@ const Flashcards: React.FC = () => {
   useEffect(() => {
     refreshCards();
   }, []);
+
+  // Funktion zum Laden der Reiseeinträge aus localStorage
+  const getImageForCard = (card: SavedFlashcard): string | null => {
+    if (!card.entryId) return null;
+    try {
+      const storedEntries = localStorage.getItem('diaryEntries');
+      if (storedEntries) {
+        const entries: SavedEntry[] = JSON.parse(storedEntries);
+        const entry = entries.find(e => e.id === card.entryId);
+        return entry?.imagePreview || null;
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden des Bildes:', error);
+    }
+    return null;
+  };
 
   const refreshCards = () => {
     const cards = loadFlashcards();
@@ -275,6 +291,7 @@ const Flashcards: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {flashcards.map((card) => {
           const isCardFlipped = flippedBrowseCards.has(card.id);
+          const cardImage = getImageForCard(card);
           
           return (
             <div key={card.id} className="group relative">
@@ -301,10 +318,10 @@ const Flashcards: React.FC = () => {
                   {/* Front Side - Spanisch */}
                   <div className="absolute inset-0 w-full h-full backface-hidden rounded-3xl overflow-hidden">
                     {/* Background Image with Gradient Overlay */}
-                    {card.imageUrl ? (
+                    {cardImage ? (
                       <div className="absolute inset-0">
                         <img 
-                          src={card.imageUrl} 
+                          src={cardImage} 
                           alt={card.location || 'Reisebild'} 
                           className="w-full h-full object-cover"
                         />
@@ -346,20 +363,8 @@ const Flashcards: React.FC = () => {
 
                   {/* Back Side - Deutsch */}
                   <div className="absolute inset-0 w-full h-full backface-hidden [transform:rotateY(180deg)] rounded-3xl overflow-hidden">
-                    {/* Background for back side */}
-                    {card.imageUrl ? (
-                      <div className="absolute inset-0">
-                        <img 
-                          src={card.imageUrl} 
-                          alt={card.location || 'Reisebild'} 
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-br from-green-600/90 via-emerald-500/85 to-teal-500/80 mix-blend-multiply"></div>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-green-500 via-emerald-600 to-teal-500"></div>
-                    )}
+                    {/* Background for back side - nur Gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-500 via-emerald-600 to-teal-500"></div>
 
                     {/* Box Badge on back */}
                     <div className={`absolute top-4 right-4 w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-2xl backdrop-blur-sm ${
