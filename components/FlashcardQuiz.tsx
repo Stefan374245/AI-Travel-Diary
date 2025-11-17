@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { SavedFlashcard } from '../types';
-import { loadFlashcards } from '../services/flashcardService';
+import { loadFlashcards, reviewFlashcard } from '../services/flashcardService';
 import { useToast } from '../contexts/ToastContext';
 
-const FlashcardQuiz: React.FC = () => {
+interface FlashcardQuizProps {
+  onQuizComplete?: () => void;
+}
+
+const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
   const [flashcards, setFlashcards] = useState<SavedFlashcard[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -16,7 +20,9 @@ const FlashcardQuiz: React.FC = () => {
     options: string[];
     imageUrl?: string;
     location?: string;
+    cardId: string; // Karten-ID für Leitner-Update
   }>>([]);
+  const [answeredCards, setAnsweredCards] = useState<Array<{ cardId: string; correct: boolean }>>([]);
   const toast = useToast();
 
   useEffect(() => {
@@ -30,9 +36,40 @@ const FlashcardQuiz: React.FC = () => {
       return;
     }
 
-    // Zufällige Karten auswählen
-    const shuffled = [...flashcards].sort(() => Math.random() - 0.5);
-    const selectedCards = shuffled.slice(0, Math.min(numQuestions, flashcards.length));
+    // Intelligente Kartenauswahl: Bevorzuge niedrigere Boxen (schwierigere Karten)
+    // Box 1-2: 60%, Box 3: 30%, Box 4-5: 10%
+    const box12Cards = flashcards.filter(c => c.box <= 2);
+    const box3Cards = flashcards.filter(c => c.box === 3);
+    const box45Cards = flashcards.filter(c => c.box >= 4);
+
+    const targetNum = Math.min(numQuestions, flashcards.length);
+    let selectedCards: SavedFlashcard[] = [];
+
+    // Berechne Anzahl pro Kategorie
+    const num12 = Math.min(Math.ceil(targetNum * 0.6), box12Cards.length);
+    const num3 = Math.min(Math.ceil(targetNum * 0.3), box3Cards.length);
+    const num45 = Math.min(targetNum - num12 - num3, box45Cards.length);
+
+    // Wähle Karten aus jeder Kategorie
+    const shuffle = (arr: SavedFlashcard[]) => [...arr].sort(() => Math.random() - 0.5);
+    
+    selectedCards = [
+      ...shuffle(box12Cards).slice(0, num12),
+      ...shuffle(box3Cards).slice(0, num3),
+      ...shuffle(box45Cards).slice(0, num45)
+    ];
+
+    // Falls nicht genug Karten vorhanden, fülle mit zufälligen auf
+    if (selectedCards.length < targetNum) {
+      const remaining = flashcards
+        .filter(c => !selectedCards.includes(c))
+        .sort(() => Math.random() - 0.5)
+        .slice(0, targetNum - selectedCards.length);
+      selectedCards = [...selectedCards, ...remaining];
+    }
+
+    // Mische die finale Auswahl
+    selectedCards = shuffle(selectedCards);
 
     const questions = selectedCards.map(card => {
       // Erstelle falsche Antworten aus anderen Karten
@@ -51,6 +88,7 @@ const FlashcardQuiz: React.FC = () => {
         options,
         imageUrl: card.imageUrl,
         location: card.location,
+        cardId: card.id, // Speichere Karten-ID
       };
     });
 
@@ -59,23 +97,54 @@ const FlashcardQuiz: React.FC = () => {
     setCurrentQuestionIndex(0);
     setScore(0);
     setShowResult(false);
+    setAnsweredCards([]); // Reset answered cards
   };
 
   const handleAnswer = (answer: string) => {
     setSelectedAnswer(answer);
     
-    if (answer === quizQuestions[currentQuestionIndex].correct) {
+    const currentQuestion = quizQuestions[currentQuestionIndex];
+    const isCorrect = answer === currentQuestion.correct;
+    
+    if (isCorrect) {
       setScore(score + 1);
     }
+
+    // Speichere Antwort für Leitner-Update
+    setAnsweredCards(prev => [...prev, { 
+      cardId: currentQuestion.cardId, 
+      correct: isCorrect 
+    }]);
 
     setTimeout(() => {
       if (currentQuestionIndex < quizQuestions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setSelectedAnswer(null);
       } else {
-        setShowResult(true);
+        // Quiz beendet - Update Leitner-System
+        finishQuiz();
       }
     }, 1500);
+  };
+
+  const finishQuiz = () => {
+    // Update alle Karten im Leitner-System
+    answeredCards.forEach(({ cardId, correct }) => {
+      reviewFlashcard(cardId, correct);
+    });
+    
+    // Letzte Karte hinzufügen
+    const lastQuestion = quizQuestions[currentQuestionIndex];
+    const lastCorrect = selectedAnswer === lastQuestion.correct;
+    reviewFlashcard(lastQuestion.cardId, lastCorrect);
+    
+    setShowResult(true);
+    toast.success(`Quiz abgeschlossen! ${answeredCards.length + 1} Karten im Leitner-System aktualisiert 🎯`);
+    
+    // Callback aufrufen, um Parent-Komponente zu refreshen
+    if (onQuizComplete) {
+      onQuizComplete();
+    }
   };
 
   const restartQuiz = () => {
@@ -84,6 +153,10 @@ const FlashcardQuiz: React.FC = () => {
     setScore(0);
     setShowResult(false);
     setSelectedAnswer(null);
+    setAnsweredCards([]);
+    // Lade Flashcards neu, um aktualisierte Box-Werte zu zeigen
+    const cards = loadFlashcards();
+    setFlashcards(cards);
   };
 
   if (flashcards.length === 0) {
@@ -127,7 +200,7 @@ const FlashcardQuiz: React.FC = () => {
           </div>
 
           <div className="text-sm opacity-75">
-            💡 Fragen werden zufällig aus deinen gespeicherten Karten generiert
+            💡 Quiz fokussiert auf schwierigere Karten (Box 1-3) für optimales Lernen
           </div>
         </div>
 
@@ -145,6 +218,11 @@ const FlashcardQuiz: React.FC = () => {
               </div>
               <div className="text-sm text-slate-600">Gut gelernt (Box 4-5)</div>
             </div>
+          </div>
+          <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+            <p className="text-xs text-slate-700">
+              <strong>📈 Quiz-Strategie:</strong> 60% Box 1-2 (schwer), 30% Box 3 (mittel), 10% Box 4-5 (leicht)
+            </p>
           </div>
         </div>
       </div>

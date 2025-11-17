@@ -95,12 +95,15 @@ const Flashcards: React.FC = () => {
     return (
       <div className="space-y-6">
         <button
-          onClick={() => setViewMode('browse')}
+          onClick={() => {
+            setViewMode('browse');
+            refreshCards(); // Refresh nach Quiz-Beendigung
+          }}
           className="text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors flex items-center gap-2"
         >
           ← Zurück zur Übersicht
         </button>
-        <FlashcardQuiz />
+        <FlashcardQuiz onQuizComplete={refreshCards} />
       </div>
     );
   }
