@@ -48,7 +48,7 @@ const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry }) => {
 
   return (
     <Stack spacing="lg">
-      <Heading level={2}>Mein Tagebuch</Heading>
+      <Heading level={3}>Mein Tagebuch</Heading>
       {entries.map(entry => (
         <Card key={entry.id} variant="default" padding="none" className="overflow-hidden transition-all duration-300">
           <div className="p-6 cursor-pointer hover:bg-neutral-50 flex justify-between items-center transition-colors" onClick={() => toggleExpand(entry.id)}>

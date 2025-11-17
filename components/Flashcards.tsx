@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SavedFlashcard, SavedEntry } from '../types';
 import { loadFlashcards, deleteFlashcard, reviewFlashcard, getDueFlashcards, getFlashcardStats } from '../services/flashcardService';
 import { TrashIcon } from './icons/TrashIcon';
 import FlashcardQuiz from './FlashcardQuiz';
 import { useToast } from '../contexts/ToastContext';
+import { Heading, Text, Stack, Card, Grid } from '../design-system';
 
 type ViewMode = 'browse' | 'study' | 'quiz';
+type FilterBox = 'all' | 1 | 2 | 3 | 4 | 5;
+type SortMode = 'recent' | 'alphabetical' | 'box';
 
 const Flashcards: React.FC = () => {
   const [flashcards, setFlashcards] = useState<SavedFlashcard[]>([]);
@@ -16,11 +19,51 @@ const Flashcards: React.FC = () => {
   const [studyCards, setStudyCards] = useState<SavedFlashcard[]>([]);
   const [slideAnimation, setSlideAnimation] = useState<'slide-out-left' | 'slide-out-right' | 'slide-in' | null>(null);
   const [flippedBrowseCards, setFlippedBrowseCards] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filterBox, setFilterBox] = useState<FilterBox>('all');
+  const [sortMode, setSortMode] = useState<SortMode>('recent');
+  const [showFilters, setShowFilters] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
     refreshCards();
   }, []);
+
+  // Filtered and sorted flashcards
+  const filteredCards = useMemo(() => {
+    let result = [...flashcards];
+    
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(card => 
+        card.es.toLowerCase().includes(query) || 
+        card.de.toLowerCase().includes(query) ||
+        (card.location && card.location.toLowerCase().includes(query))
+      );
+    }
+    
+    // Box filter
+    if (filterBox !== 'all') {
+      result = result.filter(card => card.box === filterBox);
+    }
+    
+    // Sort
+    switch (sortMode) {
+      case 'alphabetical':
+        result.sort((a, b) => a.es.localeCompare(b.es));
+        break;
+      case 'box':
+        result.sort((a, b) => a.box - b.box);
+        break;
+      case 'recent':
+      default:
+        // Already in recent order from loadFlashcards
+        break;
+    }
+    
+    return result;
+  }, [flashcards, searchQuery, filterBox, sortMode]);
 
   // Funktion zum Laden der Reiseeinträge aus localStorage
   const getImageForCard = (card: SavedFlashcard): string | null => {
@@ -97,30 +140,36 @@ const Flashcards: React.FC = () => {
 
   if (flashcards.length === 0) {
     return (
-      <div className="text-center bg-white p-8 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold text-slate-700">Keine Lernkarten gespeichert</h2>
-        <p className="mt-2 text-slate-500">
-          Gehe zum Spanisch-Lern-Chat und speichere Lernkarten, um sie hier zu sehen!
-        </p>
-      </div>
+      <Card variant="default" padding="lg" className="text-center">
+        <Stack spacing="md">
+          <div className="text-6xl animate-bounce">📚</div>
+          <Heading level={3}>Keine Lernkarten gespeichert</Heading>
+          <Text color="muted">
+            Gehe zum Spanisch-Lern-Chat und speichere Lernkarten, um sie hier zu sehen!
+          </Text>
+        </Stack>
+      </Card>
     );
   }
 
   // Quiz Mode View
   if (viewMode === 'quiz') {
     return (
-      <div className="space-y-6">
+      <Stack spacing="lg">
         <button
           onClick={() => {
             setViewMode('browse');
-            refreshCards(); // Refresh nach Quiz-Beendigung
+            refreshCards();
           }}
-          className="text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors flex items-center gap-2"
+          className="group inline-flex items-center gap-2 text-neutral-600 hover:text-primary-600 font-medium transition-all duration-200 hover:gap-3"
         >
-          ← Zurück zur Übersicht
+          <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <Text variant="label" as="span">Zurück zur Übersicht</Text>
         </button>
         <FlashcardQuiz onQuizComplete={refreshCards} />
-      </div>
+      </Stack>
     );
   }
 
@@ -128,19 +177,21 @@ const Flashcards: React.FC = () => {
   if (viewMode === 'study') {
     if (studyCards.length === 0) {
       return (
-        <div className="space-y-6">
-          <div className="text-center bg-gradient-to-br from-green-50 to-emerald-50 p-12 rounded-2xl shadow-lg border border-green-200">
-            <div className="text-6xl mb-4">🎉</div>
-            <h2 className="text-2xl font-bold text-green-800 mb-2">Perfekt!</h2>
-            <p className="text-green-700 mb-6">Keine Karten sind heute fällig. Komm morgen wieder!</p>
-            <button
-              onClick={() => setViewMode('browse')}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-            >
-              Zurück zur Übersicht
-            </button>
-          </div>
-        </div>
+        <Stack spacing="lg">
+          <Card variant="ghost" padding="xl" className="text-center bg-gradient-to-br from-success-50 to-emerald-50 border-2 border-success-200">
+            <Stack spacing="lg">
+              <div className="text-7xl animate-bounce">🎉</div>
+              <Heading level={2} className="text-success-800">Perfekt!</Heading>
+              <Text variant="body-large" className="text-success-700">Keine Karten sind heute fällig. Komm morgen wieder!</Text>
+              <button
+                onClick={() => setViewMode('browse')}
+                className="mx-auto px-8 py-4 bg-gradient-to-r from-success-600 to-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300 hover:from-success-700 hover:to-emerald-700"
+              >
+                Zurück zur Übersicht
+              </button>
+            </Stack>
+          </Card>
+        </Stack>
       );
     }
 
@@ -241,55 +292,176 @@ const Flashcards: React.FC = () => {
 
   // Browse Mode View
   return (
-    <div className="space-y-6">
+    <Stack spacing="lg">
       {/* Header with Stats */}
-      <div className="bg-white p-6 rounded-2xl shadow-lg">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h2 className="text-3xl font-bold text-slate-800">Meine Lernkarten</h2>
-            <p className="text-slate-500 mt-1">{stats.total} {stats.total === 1 ? 'Karte' : 'Karten'} gespeichert</p>
-          </div>
-          <div className="flex gap-3">
-            {stats.due > 0 && (
+      <Card variant="elevated" padding="lg" className="bg-gradient-to-br from-white to-neutral-50">
+        <Stack spacing="lg">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+            <div>
+              <Heading level={1} className="mb-2">Meine Lernkarten</Heading>
+              <Text color="muted">{stats.total} {stats.total === 1 ? 'Karte' : 'Karten'} gespeichert</Text>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {stats.due > 0 && (
+                <button
+                  onClick={startStudyMode}
+                  className="group relative overflow-hidden bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+                >
+                  <span className="relative z-10 flex items-center gap-2">🎯 {stats.due} lernen</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary-700 to-purple-700 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
+                </button>
+              )}
               <button
-                onClick={startStudyMode}
-                className="group relative overflow-hidden bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+                onClick={() => setViewMode('quiz')}
+                className="group relative overflow-hidden bg-gradient-to-r from-pink-600 to-orange-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
               >
-                <span className="relative z-10">🎯 {stats.due} lernen</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-700 to-purple-700 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
+                <span className="relative z-10 flex items-center gap-2">🎯 Quiz</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-pink-700 to-orange-700 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
               </button>
-            )}
+            </div>
+          </div>
+
+          {/* Search and Filter Bar */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 relative group">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-neutral-400 group-focus-within:text-primary-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Suche nach Spanisch, Deutsch oder Ort..."
+                className="w-full pl-12 pr-4 py-3 border-2 border-neutral-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 hover:border-primary-300 hover:shadow-md"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-neutral-400 hover:text-neutral-600 transition-colors"
+                  aria-label="Suche löschen"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
             <button
-              onClick={() => setViewMode('quiz')}
-              className="group relative overflow-hidden bg-gradient-to-r from-pink-600 to-orange-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 ${
+                showFilters 
+                  ? 'bg-primary-600 text-white shadow-lg' 
+                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+              }`}
             >
-              <span className="relative z-10">🎯 Quiz starten</span>
-              <div className="absolute inset-0 bg-gradient-to-r from-pink-700 to-orange-700 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Filter
             </button>
           </div>
-        </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="animate-fade-in">
+              <Stack spacing="md">
+                <div>
+                  <Text variant="label" color="secondary" className="mb-2">Nach Box filtern:</Text>
+                  <div className="flex flex-wrap gap-2">
+                    {(['all', 1, 2, 3, 4, 5] as FilterBox[]).map((box) => (
+                      <button
+                        key={box}
+                        onClick={() => setFilterBox(box)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                          filterBox === box
+                            ? 'bg-primary-600 text-white shadow-md scale-105'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                        }`}
+                      >
+                        {box === 'all' ? 'Alle' : `Box ${box}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Text variant="label" color="secondary" className="mb-2">Sortierung:</Text>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 'recent' as SortMode, label: '🕐 Neueste', icon: '🕐' },
+                      { value: 'alphabetical' as SortMode, label: '🔤 A-Z', icon: '🔤' },
+                      { value: 'box' as SortMode, label: '📦 Box', icon: '📦' }
+                    ].map((sort) => (
+                      <button
+                        key={sort.value}
+                        onClick={() => setSortMode(sort.value)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                          sortMode === sort.value
+                            ? 'bg-primary-600 text-white shadow-md scale-105'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                        }`}
+                      >
+                        {sort.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Stack>
+            </div>
+          )}
 
         {/* Box Statistics */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: 'Box 1', value: stats.box1, color: 'from-red-500 to-rose-600', desc: '1 Tag' },
-            { label: 'Box 2', value: stats.box2, color: 'from-orange-500 to-amber-600', desc: '2 Tage' },
+            { label: 'Box 1', value: stats.box1, color: 'from-error-500 to-error-600', desc: '1 Tag' },
+            { label: 'Box 2', value: stats.box2, color: 'from-warning-500 to-warning-600', desc: '2 Tage' },
             { label: 'Box 3', value: stats.box3, color: 'from-yellow-500 to-yellow-600', desc: '5 Tage' },
-            { label: 'Box 4', value: stats.box4, color: 'from-green-500 to-emerald-600', desc: '10 Tage' },
-            { label: 'Box 5', value: stats.box5, color: 'from-blue-500 to-cyan-600', desc: '30 Tage' }
+            { label: 'Box 4', value: stats.box4, color: 'from-success-500 to-success-600', desc: '10 Tage' },
+            { label: 'Box 5', value: stats.box5, color: 'from-primary-500 to-primary-600', desc: '30 Tage' }
           ].map((box, i) => (
-            <div key={i} className={`bg-gradient-to-br ${box.color} p-4 rounded-xl text-white shadow-md hover:shadow-lg transition-all transform hover:scale-105`}>
+            <div key={i} className={`bg-gradient-to-br ${box.color} p-4 rounded-xl text-white shadow-md hover:shadow-lg transition-all transform hover:scale-105 cursor-pointer`}>
               <div className="text-3xl font-bold">{box.value}</div>
               <div className="text-xs font-medium opacity-90">{box.label}</div>
               <div className="text-xs opacity-75">{box.desc}</div>
             </div>
           ))}
         </div>
-      </div>
+        </Stack>
+      </Card>
+
+      {/* Results Info */}
+      {filteredCards.length !== flashcards.length && (
+        <Card variant="outlined" padding="sm">
+          <Text variant="small" color="secondary" className="text-center">
+            {filteredCards.length} von {flashcards.length} Karten gefunden
+          </Text>
+        </Card>
+      )}
+
+      {/* Empty State for Filters */}
+      {filteredCards.length === 0 && (
+        <Card variant="ghost" padding="xl" className="text-center">
+          <Stack spacing="md">
+            <div className="text-6xl">🔍</div>
+            <Heading level={4}>Keine Karten gefunden</Heading>
+            <Text color="muted">Versuche andere Filter oder Suchbegriffe</Text>
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setFilterBox('all');
+              }}
+              className="mx-auto px-6 py-2 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-colors"
+            >
+              Filter zurücksetzen
+            </button>
+          </Stack>
+        </Card>
+      )}
 
       {/* Flashcards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {flashcards.map((card) => {
+        {filteredCards.map((card) => {
           const isCardFlipped = flippedBrowseCards.has(card.id);
           const cardImage = getImageForCard(card);
           
@@ -413,25 +585,27 @@ const Flashcards: React.FC = () => {
       </div>
 
       {/* Learning Tips */}
-      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-2xl p-6 shadow-md">
-        <h3 className="font-bold text-indigo-900 mb-3 flex items-center gap-2">
-          <span className="text-2xl">📚</span>
-          <span>Leitner-System: So funktioniert's</span>
-        </h3>
-        <div className="grid sm:grid-cols-2 gap-4 text-sm text-indigo-800">
-          <div className="space-y-2">
-            <p><strong>✅ Richtig beantwortet:</strong> Karte steigt in die nächste Box auf</p>
-            <p><strong>❌ Falsch beantwortet:</strong> Karte geht zurück zu Box 1</p>
-            <p><strong>📅 Wiederholung:</strong> Jede Box hat eigene Intervalle</p>
+      <Card variant="ghost" padding="lg" className="bg-gradient-to-br from-primary-50 to-purple-50 border-2 border-primary-200">
+        <Stack spacing="md">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">📚</span>
+            <Heading level={4} className="mb-0 text-primary-900">Leitner-System: So funktioniert's</Heading>
           </div>
-          <div className="space-y-2">
-            <p><strong>Box 1-2:</strong> Neue/schwierige Wörter (1-2 Tage)</p>
-            <p><strong>Box 3-4:</strong> Gut gelernte Wörter (5-10 Tage)</p>
-            <p><strong>Box 5:</strong> Perfekt! Wiederholung in 30 Tagen</p>
-          </div>
-        </div>
-      </div>
-    </div>
+          <Grid cols={2} gap="md">
+            <Stack spacing="sm">
+              <Text variant="small" className="text-primary-800"><strong>✅ Richtig beantwortet:</strong> Karte steigt in die nächste Box auf</Text>
+              <Text variant="small" className="text-primary-800"><strong>❌ Falsch beantwortet:</strong> Karte geht zurück zu Box 1</Text>
+              <Text variant="small" className="text-primary-800"><strong>📅 Wiederholung:</strong> Jede Box hat eigene Intervalle</Text>
+            </Stack>
+            <Stack spacing="sm">
+              <Text variant="small" className="text-primary-800"><strong>Box 1-2:</strong> Neue/schwierige Wörter (1-2 Tage)</Text>
+              <Text variant="small" className="text-primary-800"><strong>Box 3-4:</strong> Gut gelernte Wörter (5-10 Tage)</Text>
+              <Text variant="small" className="text-primary-800"><strong>Box 5:</strong> Perfekt! Wiederholung in 30 Tagen</Text>
+            </Stack>
+          </Grid>
+        </Stack>
+      </Card>
+    </Stack>
   );
 };
 
