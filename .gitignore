@@ -27,3 +27,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Design System - Dokumentation & Showcase (nicht ins Repository)
+components/DesignSystemShowcase.tsx
+DESIGN_SYSTEM_SUMMARY.md
+DESIGN_SYSTEM_ERKLAERUNG_FUER_ANFAENGER.md
