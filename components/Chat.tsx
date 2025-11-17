@@ -5,6 +5,7 @@ import { saveFlashcard, isFlashcardSaved } from '../services/flashcardService';
 import { ChatMessage, Flashcard, SavedEntry } from '../types';
 import { SendIcon } from './icons/SendIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
+import { Heading, Text, Stack, Card, Grid } from '../design-system';
 
 interface ChatProps {
   savedEntries: SavedEntry[];
@@ -61,31 +62,38 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
   };
 
   const FlashcardDisplay: React.FC<{ flashcards: Flashcard[] }> = ({ flashcards }) => (
-    <div className="mt-3 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-      <h4 className="text-sm font-semibold text-indigo-800 mb-2 flex items-center gap-2"><SparklesIcon /> Vorschläge für Lernkarten</h4>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-        {flashcards.map((card, i) => {
-          const isSaved = savedCards.has(card.es) || isFlashcardSaved(card);
-          return (
-            <div key={i} className="bg-white p-2 rounded-md shadow-sm relative">
-              <p className="font-medium text-slate-700">{card.es}</p>
-              <p className="text-slate-500 mb-2">{card.de}</p>
-              <button
-                onClick={() => handleSaveFlashcard(card)}
-                disabled={isSaved}
-                className={`w-full mt-2 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                  isSaved 
-                    ? 'bg-green-100 text-green-700 cursor-not-allowed' 
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                }`}
-              >
-                {isSaved ? '✓ Gespeichert' : '+ Speichern'}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <Card variant="ghost" padding="sm" className="mt-3 border border-primary-200">
+      <Stack spacing="sm">
+        <div className="flex items-center gap-2">
+          <SparklesIcon />
+          <Text variant="label" color="primary" className="text-primary-800">Vorschläge für Lernkarten</Text>
+        </div>
+        <Grid cols={2} gap="xs">
+          {flashcards.map((card, i) => {
+            const isSaved = savedCards.has(card.es) || isFlashcardSaved(card);
+            return (
+              <Card key={i} variant="default" padding="sm">
+                <Stack spacing="xs">
+                  <Text variant="body" className="font-medium">{card.es}</Text>
+                  <Text variant="small" color="muted">{card.de}</Text>
+                  <button
+                    onClick={() => handleSaveFlashcard(card)}
+                    disabled={isSaved}
+                    className={`w-full px-2 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                      isSaved 
+                        ? 'bg-success-100 text-success-700 cursor-not-allowed' 
+                        : 'bg-primary-600 text-white hover:bg-primary-700'
+                    }`}
+                  >
+                    {isSaved ? '✓ Gespeichert' : '+ Speichern'}
+                  </button>
+                </Stack>
+              </Card>
+            );
+          })}
+        </Grid>
+      </Stack>
+    </Card>
   );
 
   const handleImportEntry = (entryId: string) => {
@@ -119,98 +127,117 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md flex flex-col h-[70vh]">
-      <div className="p-4 border-b border-slate-200">
-        <h2 className="text-xl font-semibold text-slate-800">Spanisch-Lern-Chat</h2>
-        <p className="text-sm text-slate-500">Übe dein Spanisch mit deinem persönlichen AI-Tutor</p>
-        
-        {savedEntries.length > 0 && (
-          <div className="mt-3">
-            <label htmlFor="entry-select" className="block text-xs font-medium text-slate-600 mb-1">
-              📸 Reiseeintrag importieren:
-            </label>
-            <select
-              id="entry-select"
-              onChange={(e) => handleImportEntry(e.target.value)}
-              className="w-full text-sm border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-              defaultValue=""
-            >
-              <option value="" disabled>Wähle einen Reiseeintrag...</option>
-              {savedEntries.map(entry => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.location} - {new Date(entry.timestamp).toLocaleDateString('de-DE')}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+    <Card variant="default" padding="none" className="flex flex-col h-[70vh] overflow-hidden">
+      <div className="p-6 border-b border-neutral-200">
+        <Stack spacing="sm">
+          <Heading level={3} className="mb-0">Spanisch-Lern-Chat</Heading>
+          <Text variant="small" color="muted">Übe dein Spanisch mit deinem persönlichen AI-Tutor</Text>
+          
+          {savedEntries.length > 0 && (
+            <Stack spacing="xs" className="mt-2">
+              <Text variant="label" color="secondary" as="label" htmlFor="entry-select">
+                📸 Reiseeintrag importieren:
+              </Text>
+              <div className="relative group">
+                <select
+                  id="entry-select"
+                  onChange={(e) => handleImportEntry(e.target.value)}
+                  className="w-full text-sm border-2 border-neutral-200 bg-white rounded-xl shadow-sm px-4 py-2.5 pr-10 appearance-none cursor-pointer transition-all duration-200 hover:border-primary-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:shadow-lg"
+                  defaultValue=""
+                  aria-label="Reiseeintrag auswählen"
+                >
+                  <option value="" disabled>Wähle einen Reiseeintrag...</option>
+                  {savedEntries.map(entry => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.location} - {new Date(entry.timestamp).toLocaleDateString('de-DE')}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-400 group-hover:text-primary-500 transition-colors duration-200">
+                  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </div>
+            </Stack>
+          )}
+        </Stack>
       </div>
       {selectedEntry && (
-        <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex items-center gap-3">
+        <div className="px-6 py-4 bg-primary-50 border-b border-primary-200 flex items-center gap-3">
           <img 
             src={selectedEntry.imagePreview} 
             alt={selectedEntry.location} 
-            className="w-12 h-12 object-cover rounded-md"
+            className="w-12 h-12 object-cover rounded-lg shadow-sm"
           />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-indigo-900 truncate">{selectedEntry.location}</p>
-            <p className="text-xs text-indigo-700">Aktiver Kontext im Chat</p>
+            <Text variant="small" className="font-semibold text-primary-900 truncate">{selectedEntry.location}</Text>
+            <Text variant="meta" className="text-primary-700 normal-case">Aktiver Kontext im Chat</Text>
           </div>
           <button
             onClick={() => setSelectedEntry(null)}
-            className="text-indigo-600 hover:text-indigo-800 text-xs font-medium"
+            className="text-primary-600 hover:text-primary-800 transition-colors"
           >
-            ✕ Entfernen
+            <Text variant="meta" className="normal-case">✕ Entfernen</Text>
           </button>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg, index) => (
-          <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-2xl ${
-              msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-800'
-            }`}>
-              <p className="whitespace-pre-wrap">{msg.response?.reply || msg.parts[0].text}</p>
-              {msg.role === 'model' && msg.response?.suggested_flashcards && (
-                <FlashcardDisplay flashcards={msg.response.suggested_flashcards} />
-              )}
-            </div>
-          </div>
-        ))}
-         {loading && (
-          <div className="flex justify-start">
-            <div className="max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-2xl bg-slate-200 text-slate-800">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse"></div>
-                <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:0.2s]"></div>
-                <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse [animation-delay:0.4s]"></div>
+      <div className="flex-1 overflow-y-auto p-6">
+        <Stack spacing="md">
+          {messages.map((msg, index) => (
+            <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl shadow-sm ${
+                msg.role === 'user' ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-900'
+              }`}>
+                <Text variant="body" className={msg.role === 'user' ? 'text-white' : 'text-neutral-900'} as="span">
+                  {msg.response?.reply || msg.parts[0].text}
+                </Text>
+                {msg.role === 'model' && msg.response?.suggested_flashcards && (
+                  <FlashcardDisplay flashcards={msg.response.suggested_flashcards} />
+                )}
               </div>
             </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl bg-neutral-100 shadow-sm">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-neutral-400 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-neutral-400 rounded-full animate-pulse [animation-delay:0.2s]"></div>
+                  <div className="w-2 h-2 bg-neutral-400 rounded-full animate-pulse [animation-delay:0.4s]"></div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </Stack>
       </div>
-      {error && <p className="p-4 text-sm text-red-600">{error}</p>}
-      <div className="p-4 border-t border-slate-200 bg-slate-50 rounded-b-lg">
-        <form onSubmit={handleSubmit} className="flex items-center space-x-2">
+      {error && (
+        <div className="px-6 py-4">
+          <Text variant="small" color="error">{error}</Text>
+        </div>
+      )}
+      <div className="p-6 border-t border-neutral-200 bg-neutral-50 rounded-b-lg">
+        <form onSubmit={handleSubmit} className="flex items-center gap-3">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Schreibe eine Nachricht auf Spanisch..."
-            className="flex-1 block w-full border-slate-300 rounded-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm px-4 py-2"
+            className="flex-1 block w-full border-neutral-300 rounded-full shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-base px-4 py-2.5 transition-colors"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="inline-flex items-center justify-center rounded-full h-10 w-10 bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center justify-center rounded-full h-11 w-11 bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-primary-300 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+            aria-label="Nachricht senden"
           >
             <SendIcon />
           </button>
         </form>
       </div>
-    </div>
+    </Card>
   );
 };
 
