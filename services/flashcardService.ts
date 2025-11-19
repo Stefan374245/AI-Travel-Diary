@@ -90,6 +90,15 @@ export const isFlashcardSaved = (flashcard: Flashcard): boolean => {
 };
 
 /**
+ * Löscht eine Lernkarte anhand des spanischen Textes
+ */
+export const deleteFlashcardByText = (spanishText: string): void => {
+  const cards = loadFlashcards();
+  const filtered = cards.filter(card => card.es !== spanishText);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+};
+
+/**
  * Zählt die Anzahl gespeicherter Lernkarten
  */
 export const getFlashcardCount = (): number => {
