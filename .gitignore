@@ -28,7 +28,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Markdown Documentation (alle .md Dateien außer README.md ignorieren)
+*.md
+!README.md
+
 # Design System - Dokumentation & Showcase (nicht ins Repository)
 components/DesignSystemShowcase.tsx
-DESIGN_SYSTEM_SUMMARY.md
-DESIGN_SYSTEM_ERKLAERUNG_FUER_ANFAENGER.md
