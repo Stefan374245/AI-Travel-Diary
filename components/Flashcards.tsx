@@ -360,13 +360,13 @@ const Flashcards: React.FC = () => {
               <Heading level={1} className="mb-2">Meine Lernkarten</Heading>
               <Text color="muted">{stats.total} {stats.total === 1 ? 'Karte' : 'Karten'} gespeichert</Text>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               {stats.due > 0 && (
                 <button
                   onClick={startStudyMode}
                   className="group relative overflow-hidden bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
                 >
-                  <span className="relative z-10 flex items-center gap-2">🎯 {stats.due} lernen</span>
+                  <span className="relative z-10 flex items-center gap-3">🎯 {stats.due} lernen</span>
                   <div className="absolute inset-0 bg-gradient-to-r from-primary-700 to-purple-700 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
                 </button>
               )}
@@ -374,7 +374,7 @@ const Flashcards: React.FC = () => {
                 onClick={() => setViewMode('quiz')}
                 className="group relative overflow-hidden bg-gradient-to-r from-pink-600 to-orange-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
               >
-                <span className="relative z-10 flex items-center gap-2">🎯 Quiz</span>
+                <span className="relative z-10 flex items-center">🎯 Quiz</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-pink-700 to-orange-700 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
               </button>
             </div>
@@ -471,7 +471,7 @@ const Flashcards: React.FC = () => {
           )}
 
         {/* Box Statistics */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3" data-tutorial="flashcard-stats">
           {[
             { label: 'Box 1', value: stats.box1, color: 'from-error-500 to-error-600', desc: '1 Tag' },
             { label: 'Box 2', value: stats.box2, color: 'from-warning-500 to-warning-600', desc: '2 Tage' },

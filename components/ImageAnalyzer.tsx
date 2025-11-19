@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { analyzeImage } from '../services/geminiService';
 import { ImageAnalysisResult, SavedEntry } from '../types';
 import Quiz from './Quiz';
@@ -62,7 +62,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
   };
 
   const handleSubmit = useCallback(async () => {
-    if (!imageFile || !location) {
+    if (!imagePreview || !location) {
       toast.warning('Bitte wähle ein Bild aus und gib einen Ort an.');
       return;
     }
@@ -73,6 +73,9 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
     setIsSaved(false);
 
     try {
+      if (!imageFile) {
+        throw new Error('No image file selected');
+      }
       const imageData = await fileToGenerativePart(imageFile);
       const analysisResult = await analyzeImage(imageData.inlineData.data, imageData.inlineData.mimeType, location);
       setResult(analysisResult);
@@ -85,7 +88,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
     } finally {
       setLoading(false);
     }
-  }, [imageFile, location, toast]);
+  }, [imageFile, imagePreview, location, toast]);
 
   return (
     <Stack spacing="lg" className="max-w-4xl mx-auto">
@@ -100,7 +103,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
               <Text variant="label" as="label" htmlFor="file-upload" className="block mb-2">
                 Foto
               </Text>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-neutral-300 border-dashed rounded-lg hover:border-primary-400 transition-colors duration-200">
+              <div data-tutorial="upload-area" className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-neutral-300 border-dashed rounded-lg hover:border-primary-400 transition-colors duration-200">
                 <div className="space-y-2 text-center">
                   {imagePreview ? (
                     <img src={imagePreview} alt="Preview" className="mx-auto h-32 w-auto object-contain rounded-md" />
@@ -132,6 +135,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
                 Ort
               </Text>
               <input
+                data-tutorial="location-input"
                 type="text"
                 name="location"
                 id="location"
@@ -148,8 +152,9 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
 
           {/* Submit Button */}
           <button
+            data-tutorial="analyze-button"
             onClick={handleSubmit}
-            disabled={loading || !imageFile || !location}
+            disabled={loading || (!imagePreview || !location)}
             className="w-full flex items-center justify-center gap-3 px-6 py-4 border border-transparent text-base font-semibold rounded-lg shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-all duration-200"
           >
             {loading ? (
@@ -174,11 +179,12 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
       </Card>
 
       {result && (
-        <Card variant="elevated" className="animate-fade-in">
+        <Card variant="elevated" className="animate-fade-in" data-tutorial="analysis-result">
           <Stack spacing="lg">
             {/* Save Button */}
             <div className="flex justify-end">
               <button
+                data-tutorial="save-button"
                 onClick={handleSave}
                 disabled={isSaved}
                 className="px-5 py-2.5 border border-transparent text-sm font-semibold rounded-lg shadow-sm text-white bg-success-600 hover:bg-success-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-success-500 disabled:bg-success-300 disabled:cursor-not-allowed transition-all duration-200"
@@ -236,7 +242,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
             <Divider spacing="sm" />
 
             {/* Quiz */}
-            <div>
+            <div data-tutorial="analysis-quiz">
               <Heading level={4} className="mb-4">Quiz: Teste dein Wissen!</Heading>
               <Quiz quizData={result.quiz} />
             </div>
