@@ -2,9 +2,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { getChatReply } from '../services/geminiService';
 import { saveFlashcard, isFlashcardSaved } from '../services/flashcardService';
+import { ttsService } from '../services/ttsService';
 import { ChatMessage, Flashcard, SavedEntry, LanguageLevel, LanguageLevelInfo } from '../types';
 import { SendIcon } from './icons/SendIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
+import { SpeakerIcon } from './icons/SpeakerIcon';
 import { Heading, Text, Stack, Card, Grid } from '../design-system';
 
 interface ChatProps {
@@ -30,6 +32,8 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
   const [isLevelDropdownOpen, setIsLevelDropdownOpen] = useState(false);
   const [isEntryDropdownOpen, setIsEntryDropdownOpen] = useState(false);
   const [selectedEntryId, setSelectedEntryId] = useState<string>('');
+  const [speakingMessageIndex, setSpeakingMessageIndex] = useState<number | null>(null);
+  const [isTTSSupported] = useState(() => ttsService.isSupported());
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'model', parts: [{ text: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' }], response: { reply: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' } }
   ]);
@@ -86,6 +90,44 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
     if (!entry) return 'Wähle einen Reiseeintrag...';
     return `${entry.location} - ${new Date(entry.timestamp).toLocaleDateString('de-DE')}`;
   };
+
+  const handleSpeak = (text: string, messageIndex: number) => {
+    // If already speaking this message, stop it
+    if (speakingMessageIndex === messageIndex && ttsService.isSpeaking()) {
+      ttsService.stop();
+      setSpeakingMessageIndex(null);
+      return;
+    }
+
+    // Stop any current speech and start new one
+    ttsService.stop();
+    setSpeakingMessageIndex(messageIndex);
+
+    ttsService.speak(
+      text,
+      { lang: 'es-ES', rate: 0.85 },
+      () => {
+        // onStart
+        setSpeakingMessageIndex(messageIndex);
+      },
+      () => {
+        // onEnd
+        setSpeakingMessageIndex(null);
+      },
+      (error) => {
+        // onError
+        console.error('TTS Error:', error);
+        setSpeakingMessageIndex(null);
+      }
+    );
+  };
+
+  // Cleanup TTS on unmount
+  useEffect(() => {
+    return () => {
+      ttsService.stop();
+    };
+  }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,7 +246,7 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
                 type="button"
                 onClick={() => setIsLevelDropdownOpen(!isLevelDropdownOpen)}
                 className="w-full flex items-center justify-between gap-3 text-sm border-2 border-primary-200 bg-white rounded-xl shadow-sm px-4 py-3 transition-all duration-200 ease-in-out hover:border-primary-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 will-change-transform"
-                aria-expanded={String(isLevelDropdownOpen)}
+                aria-expanded={isLevelDropdownOpen}
                 aria-haspopup="listbox"
               >
                 <div className="flex flex-row items-center gap-2 flex-1 min-w-0">
@@ -283,7 +325,7 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
                   type="button"
                   onClick={() => setIsEntryDropdownOpen(!isEntryDropdownOpen)}
                   className="w-full flex items-center justify-between gap-3 text-sm border-2 border-neutral-200 bg-white rounded-xl shadow-sm px-4 py-3 will-change-[background-color,border-color,box-shadow] transition-[background-color,border-color,box-shadow] duration-300 ease-out hover:border-primary-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  aria-expanded={String(isEntryDropdownOpen)}
+                  aria-expanded={isEntryDropdownOpen}
                   aria-haspopup="listbox"
                 >
                   <span className={`truncate flex-1 text-left ${
@@ -377,9 +419,30 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
               <div className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-3 rounded-2xl shadow-sm ${
                 msg.role === 'user' ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-900'
               }`}>
-                <Text variant="body" className={msg.role === 'user' ? 'text-white' : 'text-neutral-900'} as="span">
-                  {msg.response?.reply || msg.parts[0].text}
-                </Text>
+                <div className="flex items-start gap-2">
+                  <div className="flex-1">
+                    <Text variant="body" className={msg.role === 'user' ? 'text-white' : 'text-neutral-900'} as="span">
+                      {msg.response?.reply || msg.parts[0].text}
+                    </Text>
+                  </div>
+                  {msg.role === 'model' && isTTSSupported && (
+                    <button
+                      onClick={() => handleSpeak(msg.response?.reply || msg.parts[0].text, index)}
+                      className="flex-shrink-0 p-1.5 rounded-lg hover:bg-neutral-200 transition-colors group"
+                      aria-label={speakingMessageIndex === index ? 'Stoppen' : 'Anhören'}
+                      title={speakingMessageIndex === index ? 'Stoppen' : 'Text vorlesen'}
+                    >
+                      <SpeakerIcon 
+                        className={`w-5 h-5 ${
+                          speakingMessageIndex === index 
+                            ? 'text-primary-600' 
+                            : 'text-neutral-500 group-hover:text-primary-600'
+                        }`}
+                        isPlaying={speakingMessageIndex === index}
+                      />
+                    </button>
+                  )}
+                </div>
                 {msg.role === 'model' && msg.response?.grammar_tip && (
                   <div className="mt-3 p-3 bg-info-50 border border-info-200 rounded-lg">
                     <div className="flex items-start gap-2">

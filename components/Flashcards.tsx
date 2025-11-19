@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SavedFlashcard, SavedEntry } from '../types';
 import { loadFlashcards, deleteFlashcard, reviewFlashcard, getDueFlashcards, getFlashcardStats } from '../services/flashcardService';
+import { ttsService } from '../services/ttsService';
 import { TrashIcon } from './icons/TrashIcon';
+import { SpeakerIcon } from './icons/SpeakerIcon';
 import FlashcardQuiz from './FlashcardQuiz';
 import { useToast } from '../contexts/ToastContext';
 import { Heading, Text, Stack, Card, Grid } from '../design-system';
@@ -23,10 +25,17 @@ const Flashcards: React.FC = () => {
   const [filterBox, setFilterBox] = useState<FilterBox>('all');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [showFilters, setShowFilters] = useState(false);
+  const [speakingCardId, setSpeakingCardId] = useState<string | null>(null);
+  const [isTTSSupported] = useState(() => ttsService.isSupported());
   const toast = useToast();
 
   useEffect(() => {
     refreshCards();
+    
+    // Cleanup TTS on unmount
+    return () => {
+      ttsService.stop();
+    };
   }, []);
 
   // Filtered and sorted flashcards
@@ -89,8 +98,36 @@ const Flashcards: React.FC = () => {
     setStudyCards(due);
   };
 
+  const handleSpeak = (text: string, cardId: string) => {
+    // If already speaking this card, stop it
+    if (speakingCardId === cardId && ttsService.isSpeaking()) {
+      ttsService.stop();
+      setSpeakingCardId(null);
+      return;
+    }
+
+    // Stop any current speech and start new one
+    ttsService.stop();
+    setSpeakingCardId(cardId);
+
+    ttsService.speak(
+      text,
+      { lang: 'es-ES', rate: 0.85 },
+      () => setSpeakingCardId(cardId),
+      () => setSpeakingCardId(null),
+      (error) => {
+        console.error('TTS Error:', error);
+        setSpeakingCardId(null);
+      }
+    );
+  };
+
   const handleAnswer = async (correct: boolean) => {
     if (studyCards.length === 0) return;
+    
+    // Stop any playing audio
+    ttsService.stop();
+    setSpeakingCardId(null);
     
     const currentCard = studyCards[currentCardIndex];
     
@@ -121,6 +158,8 @@ const Flashcards: React.FC = () => {
   const startStudyMode = () => {
     const due = getDueFlashcards();
     if (due.length > 0) {
+      ttsService.stop();
+      setSpeakingCardId(null);
       setStudyCards(due);
       setCurrentCardIndex(0);
       setViewMode('study');
@@ -235,6 +274,26 @@ const Flashcards: React.FC = () => {
                 {/* Front Side */}
                 <div className="absolute inset-0 w-full h-full backface-hidden">
                   <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 rounded-3xl shadow-2xl p-8 flex flex-col justify-center items-center text-white transform transition-all duration-300 group-hover:scale-105 group-hover:shadow-3xl">
+                    {isTTSSupported && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSpeak(currentCard.es, `study-${currentCard.id}`);
+                        }}
+                        className="absolute top-6 right-6 p-3 rounded-xl bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all z-10 group/speaker"
+                        aria-label={speakingCardId === `study-${currentCard.id}` ? 'Stoppen' : 'Anhören'}
+                        title="Spanisch vorlesen"
+                      >
+                        <SpeakerIcon 
+                          className={`w-6 h-6 ${
+                            speakingCardId === `study-${currentCard.id}` 
+                              ? 'text-white' 
+                              : 'text-white/80 group-hover/speaker:text-white'
+                          }`}
+                          isPlaying={speakingCardId === `study-${currentCard.id}`}
+                        />
+                      </button>
+                    )}
                     <div className="text-xs font-semibold uppercase tracking-wider opacity-75 mb-3">Spanisch</div>
                     <div className="text-5xl font-bold text-center mb-8">{currentCard.es}</div>
                     <div className="text-sm opacity-75 animate-pulse">👆 Klicken zum Umdrehen</div>
@@ -524,6 +583,26 @@ const Flashcards: React.FC = () => {
 
                     {/* Front Content - Only Spanish */}
                     <div className="relative h-full flex flex-col justify-center items-center p-6 text-white">
+                      {isTTSSupported && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSpeak(card.es, card.id);
+                          }}
+                          className="absolute top-20 right-6 p-2.5 rounded-xl bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-all z-10 group/speaker"
+                          aria-label={speakingCardId === card.id ? 'Stoppen' : 'Anhören'}
+                          title="Spanisch vorlesen"
+                        >
+                          <SpeakerIcon 
+                            className={`w-5 h-5 ${
+                              speakingCardId === card.id 
+                                ? 'text-white' 
+                                : 'text-white/80 group-hover/speaker:text-white'
+                            }`}
+                            isPlaying={speakingCardId === card.id}
+                          />
+                        </button>
+                      )}
                       <div className="text-xs font-bold uppercase tracking-widest opacity-75 mb-4">Spanisch</div>
                       <div className="text-4xl font-black drop-shadow-2xl text-center mb-8">{card.es}</div>
                       <div className="text-xs opacity-75 animate-pulse">👆 Klicken zum Umdrehen</div>
