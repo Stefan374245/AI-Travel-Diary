@@ -27,6 +27,9 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
     const saved = localStorage.getItem(STORAGE_KEY_LEVEL);
     return (saved as LanguageLevel) || 'A2';
   });
+  const [isLevelDropdownOpen, setIsLevelDropdownOpen] = useState(false);
+  const [isEntryDropdownOpen, setIsEntryDropdownOpen] = useState(false);
+  const [selectedEntryId, setSelectedEntryId] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'model', parts: [{ text: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' }], response: { reply: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' } }
   ]);
@@ -36,6 +39,8 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
   const [savedCards, setSavedCards] = useState<Set<string>>(new Set());
   const [selectedEntry, setSelectedEntry] = useState<SavedEntry | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const levelDropdownRef = useRef<HTMLDivElement>(null);
+  const entryDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -44,6 +49,43 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_LEVEL, languageLevel);
   }, [languageLevel]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (levelDropdownRef.current && !levelDropdownRef.current.contains(event.target as Node)) {
+        setIsLevelDropdownOpen(false);
+      }
+      if (entryDropdownRef.current && !entryDropdownRef.current.contains(event.target as Node)) {
+        setIsEntryDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLevelSelect = (level: LanguageLevel) => {
+    setLanguageLevel(level);
+    setIsLevelDropdownOpen(false);
+  };
+
+  const handleEntrySelect = (entryId: string) => {
+    setSelectedEntryId(entryId);
+    setIsEntryDropdownOpen(false);
+    handleImportEntry(entryId);
+  };
+
+  const getCurrentLevelInfo = () => {
+    return LANGUAGE_LEVELS.find(lvl => lvl.level === languageLevel) || LANGUAGE_LEVELS[1];
+  };
+
+  const getSelectedEntryLabel = () => {
+    if (!selectedEntryId) return 'Wähle einen Reiseeintrag...';
+    const entry = savedEntries.find(e => e.id === selectedEntryId);
+    if (!entry) return 'Wähle einen Reiseeintrag...';
+    return `${entry.location} - ${new Date(entry.timestamp).toLocaleDateString('de-DE')}`;
+  };
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,56 +195,157 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
           <Text variant="small" color="muted">Übe dein Spanisch mit deinem persönlichen AI-Tutor</Text>
           
           <Stack spacing="xs" className="mt-2">
-            <Text variant="label" color="secondary" as="label" htmlFor="level-select">
+            <Text variant="label" color="secondary" as="label">
               📊 Sprachniveau:
             </Text>
-            <div className="relative group">
-              <select
-                id="level-select"
-                value={languageLevel}
-                onChange={(e) => setLanguageLevel(e.target.value as LanguageLevel)}
-                className="w-full text-sm border-2 border-primary-200 bg-gradient-to-r from-primary-50 to-white rounded-xl shadow-sm px-4 py-2.5 pr-10 appearance-none cursor-pointer transition-all duration-200 hover:border-primary-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:shadow-lg font-medium text-primary-900"
-                aria-label="Sprachniveau auswählen"
+            <div ref={levelDropdownRef} className="relative">
+              {/* Dropdown Button */}
+              <button
+                type="button"
+                onClick={() => setIsLevelDropdownOpen(!isLevelDropdownOpen)}
+                className="w-full flex items-center justify-between gap-3 text-sm border-2 border-primary-200 bg-white rounded-xl shadow-sm px-4 py-3 transition-all duration-200 ease-in-out hover:border-primary-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 will-change-transform"
+                aria-expanded={String(isLevelDropdownOpen)}
+                aria-haspopup="listbox"
               >
-                {LANGUAGE_LEVELS.map(lvl => (
-                  <option key={lvl.level} value={lvl.level}>
-                    {lvl.label} - {lvl.description}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-primary-500 group-hover:text-primary-600 transition-colors duration-200">
-                <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                <div className="flex flex-row items-center gap-2 flex-1 min-w-0">
+                  <span className="font-semibold text-primary-900 text-base flex-shrink-0">
+                    {getCurrentLevelInfo().level}
+                  </span>
+                  <span className="text-xs text-primary-700 truncate hidden sm:block mt-1">
+                    {getCurrentLevelInfo().description}
+                  </span>
+                </div>
+                <svg 
+                  className={`h-5 w-5 text-primary-500 transition-transform duration-300 flex-shrink-0 ${
+                    isLevelDropdownOpen ? 'rotate-180' : ''
+                  }`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
-              </div>
+              </button>
+
+              {/* Dropdown Menu */}
+              {isLevelDropdownOpen && (
+                <div className="absolute z-50 w-full mt-2 bg-white border-2 border-primary-200 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+                  <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+                    {LANGUAGE_LEVELS.map((lvl) => (
+                      <button
+                        key={lvl.level}
+                        type="button"
+                        onClick={() => handleLevelSelect(lvl.level)}
+                        className={`w-full text-left px-4 py-3 transition-colors duration-150 ease-in-out border-b border-neutral-100 last:border-b-0 hover:bg-primary-50 focus:outline-none focus:bg-primary-100 ${
+                          lvl.level === languageLevel 
+                            ? 'bg-primary-100 border-l-4 border-l-primary-600' 
+                            : 'border-l-4 border-l-transparent hover:border-l-primary-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`font-bold text-base ${
+                                lvl.level === languageLevel ? 'text-primary-800' : 'text-primary-700'
+                              }`}>
+                                {lvl.level}
+                              </span>
+                              <span className="hidden sm:inline text-xs text-neutral-600 font-medium">
+                                {lvl.label.split(' - ')[1]}
+                              </span>
+                            </div>
+                            <p className="text-xs text-neutral-600 truncate">
+                              {lvl.description}
+                            </p>
+                          </div>
+                          {lvl.level === languageLevel && (
+                            <svg className="w-5 h-5 text-primary-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </Stack>
           
           {savedEntries.length > 0 && (
             <Stack spacing="xs" className="mt-2">
-              <Text variant="label" color="secondary" as="label" htmlFor="entry-select">
+              <Text variant="label" color="secondary" as="label">
                 📸 Reiseeintrag importieren:
               </Text>
-              <div className="relative group">
-                <select
-                  id="entry-select"
-                  onChange={(e) => handleImportEntry(e.target.value)}
-                  className="w-full text-sm border-2 border-neutral-200 bg-white rounded-xl shadow-sm px-4 py-2.5 pr-10 appearance-none cursor-pointer transition-all duration-200 hover:border-primary-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:shadow-lg"
-                  defaultValue=""
-                  aria-label="Reiseeintrag auswählen"
+              <div ref={entryDropdownRef} className="relative">
+                {/* Dropdown Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsEntryDropdownOpen(!isEntryDropdownOpen)}
+                  className="w-full flex items-center justify-between gap-3 text-sm border-2 border-neutral-200 bg-white rounded-xl shadow-sm px-4 py-3 will-change-[background-color,border-color,box-shadow] transition-[background-color,border-color,box-shadow] duration-300 ease-out hover:border-primary-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  aria-expanded={String(isEntryDropdownOpen)}
+                  aria-haspopup="listbox"
                 >
-                  <option value="" disabled>Wähle einen Reiseeintrag...</option>
-                  {savedEntries.map(entry => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.location} - {new Date(entry.timestamp).toLocaleDateString('de-DE')}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-neutral-400 group-hover:text-primary-500 transition-colors duration-200">
-                  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                  <span className={`truncate flex-1 text-left ${
+                    selectedEntryId ? 'text-neutral-900' : 'text-neutral-500'
+                  }`}>
+                    {getSelectedEntryLabel()}
+                  </span>
+                  <svg 
+                    className={`h-5 w-5 text-neutral-500 transition-transform duration-300 flex-shrink-0 ${
+                      isEntryDropdownOpen ? 'rotate-180' : ''
+                    }`}
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
-                </div>
+                </button>
+
+                {/* Dropdown Menu */}
+                {isEntryDropdownOpen && (
+                  <div className="absolute z-50 w-full mt-2 bg-white border-2 border-neutral-200 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+                    <div className="max-h-[40vh] overflow-y-auto custom-scrollbar">
+                      {savedEntries.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={() => handleEntrySelect(entry.id)}
+                          className={`w-full text-left px-4 py-3 transition-colors duration-150 ease-in-out border-b border-neutral-100 last:border-b-0 hover:bg-primary-50 focus:outline-none focus:bg-primary-100 ${
+                            entry.id === selectedEntryId 
+                              ? 'bg-primary-100 border-l-4 border-l-primary-600' 
+                              : 'border-l-4 border-l-transparent hover:border-l-primary-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`font-medium text-sm truncate ${
+                                  entry.id === selectedEntryId ? 'text-primary-800' : 'text-neutral-900'
+                                }`}>
+                                  {entry.location}
+                                </span>
+                              </div>
+                              <p className="text-xs text-neutral-600">
+                                {new Date(entry.timestamp).toLocaleDateString('de-DE', { 
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric' 
+                                })}
+                              </p>
+                            </div>
+                            {entry.id === selectedEntryId && (
+                              <svg className="w-5 h-5 text-primary-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </Stack>
           )}
