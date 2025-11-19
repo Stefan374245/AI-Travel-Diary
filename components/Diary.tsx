@@ -98,13 +98,13 @@ const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry }) => {
                       <table className="min-w-full divide-y divide-neutral-200">
                         <thead className="bg-neutral-100">
                           <tr>
-                            <th scope="col" className="px-6 py-3 text-left">
+                            <th scope="col" className="px-4 md:px-6 py-3 text-left">
                               <Text variant="meta" color="muted" as="span">Spanisch</Text>
                             </th>
-                            <th scope="col" className="px-6 py-3 text-left">
+                            <th scope="col" className="px-4 md:px-6 py-3 text-left">
                               <Text variant="meta" color="muted" as="span">Deutsch</Text>
                             </th>
-                            <th scope="col" className="px-6 py-3 text-right">
+                            <th scope="col" className="hidden md:table-cell px-6 py-3 text-right">
                               <Text variant="meta" color="muted" as="span">Aktionen</Text>
                             </th>
                           </tr>
@@ -112,13 +112,30 @@ const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry }) => {
                         <tbody className="bg-white divide-y divide-neutral-200">
                           {entry.analysisResult.vocab.map((v, i) => (
                             <tr key={i} className="group hover:bg-primary-50 transition-colors">
-                              <td className="px-6 py-4 whitespace-nowrap">
+                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                                 <Text variant="body" className="font-medium">{v.es}</Text>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <Text variant="body" color="secondary">{v.de}</Text>
+                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                                {/* Mobile: Button direkt neben deutschem Wort */}
+                                <div className="flex md:hidden items-center justify-between gap-3">
+                                  <Text variant="body" color="secondary">{v.de}</Text>
+                                  <button
+                                    onClick={() => handleAddToFlashcards(v, entry)}
+                                    disabled={isFlashcardSaved(v)}
+                                    className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg transition-all transform ${
+                                      isFlashcardSaved(v)
+                                        ? 'bg-success-100 text-success-700 cursor-not-allowed'
+                                        : 'bg-primary-600 text-white hover:bg-primary-700 hover:scale-110 shadow-sm hover:shadow-md'
+                                    }`}
+                                    title={isFlashcardSaved(v) ? 'Bereits gespeichert' : 'Zu Lernkarten hinzufügen'}
+                                  >
+                                    {isFlashcardSaved(v) ? '✓' : '+'}
+                                  </button>
+                                </div>
+                                {/* Desktop: Nur Text */}
+                                <Text variant="body" color="secondary" className="hidden md:block">{v.de}</Text>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-right">
                                 <button
                                   onClick={() => handleAddToFlashcards(v, entry)}
                                   disabled={isFlashcardSaved(v)}
