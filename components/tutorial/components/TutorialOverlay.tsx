@@ -203,13 +203,13 @@ const TutorialOverlay: React.FC = () => {
 
         {/* Content */}
         <div className="mb-4">
-          <h3 className="text-xl font-bold text-slate-900 mb-2">{title}</h3>
-          <p className="text-slate-600 leading-relaxed">{description}</p>
+          <h3 className="text-xl font-bold text-neutral-900 mb-2">{title}</h3>
+          <p className="text-neutral-600 leading-relaxed">{description}</p>
         </div>
 
         {/* Step Indicator */}
         {showProgress && (
-          <div className="text-sm text-slate-500 mb-4 text-center">
+          <div className="text-sm text-neutral-500 mb-4 text-center">
             Schritt {currentStepIndex + 1} von {totalSteps}
           </div>
         )}
@@ -218,7 +218,7 @@ const TutorialOverlay: React.FC = () => {
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={skipTutorial}
-            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
           >
             Überspringen
           </button>
@@ -227,14 +227,14 @@ const TutorialOverlay: React.FC = () => {
             {!isFirstStep && (
               <button
                 onClick={prevStep}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors"
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-neutral-200 text-neutral-700 hover:bg-neutral-300 transition-colors"
               >
                 Zurück
               </button>
             )}
             <button
               onClick={nextStep}
-              className="px-6 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-md"
+              className="px-6 py-2 text-sm font-semibold rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-md"
             >
               {isLastStep ? 'Fertig' : 'Weiter'}
             </button>
