@@ -17,6 +17,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
   const [location, setLocation] = useState<string>('');
   const [result, setResult] = useState<ImageAnalysisResult | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const toast = useToast();
@@ -68,9 +69,21 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
     }
 
     setLoading(true);
+    setLoadingProgress(0);
     setError(null);
     setResult(null);
     setIsSaved(false);
+
+    // Simulate smooth progress
+    const progressInterval = setInterval(() => {
+      setLoadingProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 300);
 
     try {
       if (!imageFile) {
@@ -78,8 +91,12 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
       }
       const imageData = await fileToGenerativePart(imageFile);
       const analysisResult = await analyzeImage(imageData.inlineData.data, imageData.inlineData.mimeType, location);
-      setResult(analysisResult);
-      toast.success('Bildanalyse erfolgreich abgeschlossen! ✨');
+      clearInterval(progressInterval);
+      setLoadingProgress(100);
+      setTimeout(() => {
+        setResult(analysisResult);
+        toast.success('Bildanalyse erfolgreich abgeschlossen! ✨');
+      }, 200);
     } catch (err) {
       console.error(err);
       const errorMsg = 'Fehler bei der Analyse des Bildes. Bitte versuche es erneut.';
@@ -151,24 +168,35 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
           </Grid>
 
           {/* Submit Button */}
-          <button
-            data-tutorial="analyze-button"
-            onClick={handleSubmit}
-            disabled={loading || (!imagePreview || !location)}
-            className="w-full flex items-center justify-center gap-3 px-6 py-4 border border-transparent text-base font-semibold rounded-lg shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-all duration-200"
-          >
-            {loading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Analysiere...</span>
-              </>
-            ) : (
-              <>
-                <SparklesIcon />
-                <span>Reiseeintrag erstellen</span>
-              </>
+          <div className="space-y-3">
+            <button
+              data-tutorial="analyze-button"
+              onClick={handleSubmit}
+              disabled={loading || (!imagePreview || !location)}
+              className="w-full flex items-center justify-center gap-3 px-6 py-4 border border-transparent text-base font-semibold rounded-lg shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-neutral-300 disabled:cursor-not-allowed transition-all duration-200"
+            >
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Analysiere...</span>
+                </>
+              ) : (
+                <>
+                  <SparklesIcon />
+                  <span>Reiseeintrag erstellen</span>
+                </>
+              )}
+            </button>
+            
+            {loading && (
+              <div className="relative h-2 bg-neutral-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full gradient-progress-bar transition-all duration-300 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                />
+              </div>
             )}
-          </button>
+          </div>
 
           {error && (
             <Card variant="outlined" padding="sm" className="bg-error-50 border-error-200">

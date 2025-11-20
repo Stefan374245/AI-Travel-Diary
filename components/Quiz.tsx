@@ -26,20 +26,20 @@ const Quiz: React.FC<QuizProps> = ({ quizData }) => {
   const getOptionClass = (questionIndex: number, option: string) => {
     if (!submitted) {
       return selectedAnswers[questionIndex] === option
-        ? 'bg-indigo-200 border-indigo-400'
-        : 'bg-white hover:bg-slate-100 border-slate-300';
+        ? 'bg-primary-100 border-primary-400'
+        : 'bg-white hover:bg-neutral-50 border-neutral-300';
     }
 
     const isCorrect = option === quizData[questionIndex].correct;
     const isSelected = option === selectedAnswers[questionIndex];
 
     if (isCorrect) {
-      return 'bg-green-100 border-green-400 text-green-800';
+      return 'bg-success-100 border-success-400 text-success-800';
     }
     if (isSelected && !isCorrect) {
-      return 'bg-red-100 border-red-400 text-red-800';
+      return 'bg-error-100 border-error-400 text-error-800';
     }
-    return 'bg-slate-50 border-slate-300 text-slate-500';
+    return 'bg-neutral-50 border-neutral-300 text-neutral-500';
   };
 
   const calculateScore = () => {
@@ -49,10 +49,10 @@ const Quiz: React.FC<QuizProps> = ({ quizData }) => {
   };
 
   return (
-    <div className="space-y-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+    <div className="space-y-6 bg-neutral-50 p-4 rounded-lg border border-neutral-200">
       {quizData.map((q, qIndex) => (
         <div key={qIndex}>
-          <p className="font-medium text-slate-700 mb-3">{qIndex + 1}. {q.question}</p>
+          <p className="font-medium text-neutral-700 mb-3">{qIndex + 1}. {q.question}</p>
           <div className="space-y-2">
             {q.options.map((option, oIndex) => (
               <button
@@ -69,14 +69,14 @@ const Quiz: React.FC<QuizProps> = ({ quizData }) => {
       ))}
       <div className="mt-6 text-center">
         {submitted ? (
-          <div className="p-4 bg-indigo-100 text-indigo-800 rounded-lg">
+          <div className="p-4 bg-primary-100 text-primary-800 rounded-lg">
             <p className="font-semibold text-lg">Dein Ergebnis: {calculateScore()} / {quizData.length}</p>
           </div>
         ) : (
           <button
             onClick={handleSubmit}
             disabled={selectedAnswers.some(a => a === null)}
-            className="px-6 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed"
+            className="px-6 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-primary-300 disabled:cursor-not-allowed"
           >
             Antworten prüfen
           </button>
