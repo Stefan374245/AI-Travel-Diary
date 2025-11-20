@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { analyzeImage } from '../services/geminiService';
-import { ImageAnalysisResult, SavedEntry, Coordinates } from '../types';
-import Quiz from './Quiz';
-import { UploadIcon } from './icons/UploadIcon';
-import { SparklesIcon } from './icons/SparklesIcon';
-import { useToast } from '../contexts/ToastContext';
-import { Heading, Text, Stack, Card, Grid, Divider } from '../design-system';
+import { analyzeImage } from '../../services/geminiService';
+import { ImageAnalysisResult, SavedEntry, Coordinates } from '../../types';
+import Quiz from '../shared/Quiz';
+import { UploadIcon } from '../icons/UploadIcon';
+import { SparklesIcon } from '../icons/SparklesIcon';
+import { useToast } from '../../contexts/ToastContext';
+import { Heading, Text, Stack, Card, Grid, Divider } from '../../design-system';
 
 interface ImageAnalyzerProps {
   onSaveEntry: (entryData: Omit<SavedEntry, 'id' | 'timestamp'>) => void;

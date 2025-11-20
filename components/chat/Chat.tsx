@@ -1,13 +1,13 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { getChatReply } from '../services/geminiService';
-import { saveFlashcard, isFlashcardSaved } from '../services/flashcardService';
-import { ttsService } from '../services/ttsService';
-import { ChatMessage, Flashcard, SavedEntry, LanguageLevel, LanguageLevelInfo } from '../types';
-import { SendIcon } from './icons/SendIcon';
-import { SparklesIcon } from './icons/SparklesIcon';
-import { SpeakerIcon } from './icons/SpeakerIcon';
-import { Heading, Text, Stack, Card, Grid } from '../design-system';
+import { getChatReply } from '../../services/geminiService';
+import { saveFlashcard, isFlashcardSaved } from '../../services/flashcardService';
+import { ttsService } from '../../services/ttsService';
+import { ChatMessage, Flashcard, SavedEntry, LanguageLevel, LanguageLevelInfo } from '../../types';
+import { SendIcon } from '../icons/SendIcon';
+import { SparklesIcon } from '../icons/SparklesIcon';
+import { SpeakerIcon } from '../icons/SpeakerIcon';
+import { Heading, Text, Stack, Card, Grid } from '../../design-system';
 
 interface ChatProps {
   savedEntries: SavedEntry[];

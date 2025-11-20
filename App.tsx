@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import 'leaflet/dist/leaflet.css';
-import ImageAnalyzer from './components/ImageAnalyzer';
-import Chat from './components/Chat';
-import Diary from './components/Diary';
-import Flashcards from './components/Flashcards';
+import ImageAnalyzer from './components/image-analyzer/ImageAnalyzer';
+import Chat from './components/chat/Chat';
+import Diary from './components/diary/Diary';
+import Flashcards from './components/flashcards/Flashcards';
 import { CameraIcon } from './components/icons/CameraIcon';
 import { ChatBubbleIcon } from './components/icons/ChatBubbleIcon';
 import { BookOpenIcon } from './components/icons/BookOpenIcon';
@@ -19,6 +19,7 @@ type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('analyzer');
   const [savedEntries, setSavedEntries] = useState<SavedEntry[]>([]);
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -41,7 +42,13 @@ const App: React.FC = () => {
     const updatedEntries = [newEntry, ...savedEntries];
     setSavedEntries(updatedEntries);
     localStorage.setItem('diaryEntries', JSON.stringify(updatedEntries));
+    setExpandedEntryId(newEntry.id);
     setActiveTab('diary');
+    // Scroll zum neuen Eintrag nach Tab-Wechsel
+    setTimeout(() => {
+      const element = document.getElementById(`entry-${newEntry.id}`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   };
 
   const handleDeleteEntry = (id: string) => {
@@ -68,7 +75,7 @@ const App: React.FC = () => {
       case 'chat':
         return <Chat savedEntries={savedEntries} />;
       case 'diary':
-        return <Diary entries={savedEntries} onDeleteEntry={handleDeleteEntry} onUpdateEntry={handleUpdateEntry} />;
+        return <Diary entries={savedEntries} onDeleteEntry={handleDeleteEntry} onUpdateEntry={handleUpdateEntry} expandedEntryId={expandedEntryId} setExpandedEntryId={setExpandedEntryId} />;
       case 'flashcards':
         return <Flashcards />;
       default:

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { SavedFlashcard, SavedEntry } from '../types';
-import { loadFlashcards, deleteFlashcard, reviewFlashcard, getDueFlashcards, getFlashcardStats } from '../services/flashcardService';
-import { ttsService } from '../services/ttsService';
-import { TrashIcon } from './icons/TrashIcon';
-import { SpeakerIcon } from './icons/SpeakerIcon';
+import { SavedFlashcard, SavedEntry } from '../../types';
+import { loadFlashcards, deleteFlashcard, reviewFlashcard, getDueFlashcards, getFlashcardStats } from '../../services/flashcardService';
+import { ttsService } from '../../services/ttsService';
+import { TrashIcon } from '../icons/TrashIcon';
+import { SpeakerIcon } from '../icons/SpeakerIcon';
 import FlashcardQuiz from './FlashcardQuiz';
-import { useToast } from '../contexts/ToastContext';
-import { Heading, Text, Stack, Card, Grid } from '../design-system';
+import { useToast } from '../../contexts/ToastContext';
+import { Heading, Text, Stack, Card, Grid } from '../../design-system';
 
 type ViewMode = 'browse' | 'study' | 'quiz';
 type FilterBox = 'all' | 1 | 2 | 3 | 4 | 5;

@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { SavedEntry } from '../types';
-import { Heading, Text, Stack, Card } from '../design-system';
+import { SavedEntry } from '../../types';
+import { Heading, Text, Stack, Card } from '../../design-system';
 
 // Fix für Leaflet Icons in Vite/Webpack
 delete (L.Icon.Default.prototype as any)._getIconUrl;

@@ -7,8 +7,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 const imageAnalysisSchema = {
     type: Type.OBJECT,
     properties: {
-        description_de: { type: Type.STRING, description: "Kurze Beschreibung des Bildes auf Deutsch (1-2 Sätze)." },
         description_es: { type: Type.STRING, description: "Detaillierte Beschreibung auf Spanisch (3-5 Sätze, A2-B1 Niveau)." },
+        description_de: { type: Type.STRING, description: "Exakte deutsche Übersetzung der spanischen Beschreibung (description_es)." },
         vocab: {
             type: Type.ARRAY,
             items: {
@@ -76,7 +76,14 @@ export const analyzeImage = async (imageDataBase64: string, mimeType: string, lo
 
 Ort: ${location}
 
-Analysiere das Bild und den Ort und gib ein JSON-Objekt zurück, das der angegebenen Struktur entspricht. Der spanische Inhalt sollte auf dem Niveau A2-B1 sein. Sei freundlich, motivierend und praxisnah.`;
+Analysiere das Bild und den Ort und gib ein JSON-Objekt zurück:
+1. Schreibe zuerst eine detaillierte Beschreibung auf Spanisch (description_es, 3-5 Sätze, A2-B1 Niveau)
+2. Übersetze diese Beschreibung EXAKT ins Deutsche (description_de) - nicht zusammenfassen oder ändern, sondern 1:1 übersetzen
+3. Erstelle eine Liste von 5-10 wichtigen Vokabeln aus der spanischen Beschreibung (Spanisch -> Deutsch)
+4. Erstelle 3 Multiple-Choice-Quizfragen auf Spanisch
+5. Füge relevante Tags/Labels hinzu
+
+Sei freundlich, motivierend und praxisnah.`;
 
     const imagePart = {
         inlineData: {

@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
-import { SavedEntry, Flashcard, Coordinates } from '../types';
-import Quiz from './Quiz';
+import { SavedEntry, Flashcard, Coordinates } from '../../types';
+import Quiz from '../shared/Quiz';
 import TravelMap from './TravelMap';
-import { TrashIcon } from './icons/TrashIcon';
-import { saveFlashcard, isFlashcardSaved, deleteFlashcardByText } from '../services/flashcardService';
-import { useToast } from '../contexts/ToastContext';
-import { Heading, Text, Stack, Card, Grid, Divider } from '../design-system';
+import { TrashIcon } from '../icons/TrashIcon';
+import { saveFlashcard, isFlashcardSaved, deleteFlashcardByText } from '../../services/flashcardService';
+import { useToast } from '../../contexts/ToastContext';
+import { Heading, Text, Stack, Card, Grid, Divider } from '../../design-system';
 
 interface DiaryProps {
   entries: SavedEntry[];
   onDeleteEntry: (id: string) => void;
   onUpdateEntry: (entry: SavedEntry) => void;
+  expandedEntryId: string | null;
+  setExpandedEntryId: (id: string | null) => void;
 }
 
-const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry, onUpdateEntry }) => {
-  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry, onUpdateEntry, expandedEntryId, setExpandedEntryId }) => {
   const [editMode, setEditMode] = useState<{ [key: string]: boolean }>({});
   const [editLocation, setEditLocation] = useState<{ [key: string]: string }>({});
   const [editCitySearch, setEditCitySearch] = useState<{ [key: string]: string }>({});
