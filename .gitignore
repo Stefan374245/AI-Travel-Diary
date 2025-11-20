@@ -28,6 +28,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# Documentation
+*.md
+!README.md
+
 # Markdown Documentation (alle .md Dateien außer README.md ignorieren)
 *.md
 !README.md
