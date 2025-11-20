@@ -243,6 +243,7 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
             <div ref={levelDropdownRef} className="relative">
               {/* Dropdown Button */}
               <button
+                data-tutorial="language-level"
                 type="button"
                 onClick={() => setIsLevelDropdownOpen(!isLevelDropdownOpen)}
                 className="w-full flex items-center justify-between gap-3 text-sm border-2 border-primary-200 bg-white rounded-xl shadow-sm px-4 py-3 transition-all duration-200 ease-in-out hover:border-primary-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 will-change-transform"

@@ -227,3 +227,10 @@ export const breakpoints = {
   xl: '1280px',
   '2xl': '1536px',
 } as const;
+
+// Font Families - Brand Typography
+export const fontFamily = {
+  sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+  display: ['Playfair Display', 'Georgia', 'serif'],
+  heading: ['Sora', 'Inter', 'sans-serif'],
+} as const;

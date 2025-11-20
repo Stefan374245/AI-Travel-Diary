@@ -84,8 +84,8 @@ const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry }) => {
   return (
     <Stack spacing="lg">
       <Heading level={3}>Mein Tagebuch</Heading>
-      {entries.map(entry => (
-        <Card key={entry.id} variant="default" padding="none" className="overflow-hidden transition-all duration-300">
+      {entries.map((entry, index) => (
+        <Card key={entry.id} variant="default" padding="none" className="overflow-hidden transition-all duration-300" data-tutorial={index === 0 ? 'diary-entry' : undefined}>
           <div className="p-6 cursor-pointer hover:bg-neutral-50 flex justify-between items-center transition-colors" onClick={() => toggleExpand(entry.id)}>
             <div className="flex items-center gap-4">
               <img src={entry.imagePreview} alt={entry.location} className="h-16 w-16 object-cover rounded-lg flex-shrink-0 shadow-sm" />
