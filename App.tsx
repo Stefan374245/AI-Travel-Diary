@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import 'leaflet/dist/leaflet.css';
 import ImageAnalyzer from './components/ImageAnalyzer';
 import Chat from './components/Chat';
 import Diary from './components/Diary';
@@ -51,6 +52,14 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateEntry = (updatedEntry: SavedEntry) => {
+    const updatedEntries = savedEntries.map(entry => 
+      entry.id === updatedEntry.id ? updatedEntry : entry
+    );
+    setSavedEntries(updatedEntries);
+    localStorage.setItem('diaryEntries', JSON.stringify(updatedEntries));
+  };
+
 
   const renderContent = () => {
     switch (activeTab) {
@@ -59,7 +68,7 @@ const App: React.FC = () => {
       case 'chat':
         return <Chat savedEntries={savedEntries} />;
       case 'diary':
-        return <Diary entries={savedEntries} onDeleteEntry={handleDeleteEntry} />;
+        return <Diary entries={savedEntries} onDeleteEntry={handleDeleteEntry} onUpdateEntry={handleUpdateEntry} />;
       case 'flashcards':
         return <Flashcards />;
       default:
