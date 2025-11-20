@@ -167,6 +167,7 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
   // 💪 Power-Ups
   const [fiftyFiftyUsed, setFiftyFiftyUsed] = useState(false);
   const [doublePointsActive, setDoublePointsActive] = useState(false);
+  const [doublePointsUsed, setDoublePointsUsed] = useState(false);
   const [hiddenOptions, setHiddenOptions] = useState<string[]>([]);
   
   // 🎊 Konfetti
@@ -255,6 +256,7 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
     setBestStreak(0);
     setFiftyFiftyUsed(false);
     setDoublePointsActive(false);
+    setDoublePointsUsed(false);
     setHiddenOptions([]);
     setShowConfetti(false);
     setAnimationState(null);
@@ -290,6 +292,7 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
       if (doublePointsActive) {
         toast.success(`+${points} Punkte! 🔥 Double Points aktiv!`);
         setDoublePointsActive(false);
+        setDoublePointsUsed(true);
       }
     } else {
       // ⚡ Streak zurücksetzen bei falscher Antwort
@@ -355,7 +358,7 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
 
   // 💪 Power-Up: Double Points
   const useDoublePoints = () => {
-    if (doublePointsActive || selectedAnswer) return;
+    if (doublePointsUsed || doublePointsActive || selectedAnswer) return;
     setDoublePointsActive(true);
     toast.success('Double Points aktiviert! Nächste richtige Antwort = 2 Punkte! 🔥');
   };
@@ -561,16 +564,18 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
           </button>
           <button
             onClick={useDoublePoints}
-            disabled={doublePointsActive || selectedAnswer !== null}
+            disabled={doublePointsUsed || doublePointsActive || selectedAnswer !== null}
             className={`flex-1 px-4 py-3 rounded-xl font-bold text-sm transition-all transform hover:scale-105 ${
-              doublePointsActive 
+              doublePointsUsed
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                : doublePointsActive 
                 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg animate-pulse' 
                 : selectedAnswer !== null
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg hover:shadow-xl'
             }`}
           >
-            {doublePointsActive ? '⚡ AKTIV!' : '🔥 2x Punkte'}
+            {doublePointsUsed ? '✓ 2x Verwendet' : doublePointsActive ? '⚡ AKTIV!' : '🔥 2x Punkte'}
           </button>
         </div>
       </div>
