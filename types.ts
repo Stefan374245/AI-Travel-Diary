@@ -60,10 +60,16 @@ export interface ChatConfig {
   languageLevel: LanguageLevel;
 }
 
+export interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
 export interface SavedEntry {
   id: string;
   timestamp: string;
   imagePreview: string;
   location: string;
+  coordinates?: Coordinates; // Optional: GPS-Koordinaten
   analysisResult: ImageAnalysisResult;
 }
