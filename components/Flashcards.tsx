@@ -27,6 +27,12 @@ const Flashcards: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [speakingCardId, setSpeakingCardId] = useState<string | null>(null);
   const [isTTSSupported] = useState(() => ttsService.isSupported());
+  
+  // 🎮 Swipe Mechanik für Study Mode
+  const [swipeOffset, setSwipeOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  
   const toast = useToast();
 
   useEffect(() => {
@@ -155,6 +161,39 @@ const Flashcards: React.FC = () => {
     refreshCards();
   };
 
+  // 🎮 Swipe Handler Functions für Study Mode
+  const handleSwipeStart = (clientX: number, clientY: number) => {
+    if (!isFlipped) return; // Nur swipen wenn Karte umgedreht ist
+    setIsDragging(true);
+    setStartPos({ x: clientX, y: clientY });
+  };
+
+  const handleSwipeMove = (clientX: number, clientY: number) => {
+    if (!isDragging || !isFlipped) return;
+    const deltaX = clientX - startPos.x;
+    const deltaY = clientY - startPos.y;
+    setSwipeOffset({ x: deltaX, y: deltaY });
+  };
+
+  const handleSwipeEnd = async () => {
+    if (!isDragging || !isFlipped) return;
+    setIsDragging(false);
+    
+    const SWIPE_THRESHOLD = 120;
+    
+    // Swipe Right = Richtig, Swipe Left = Falsch
+    if (swipeOffset.x > SWIPE_THRESHOLD) {
+      // Swipe Right - Richtig
+      await handleAnswer(true);
+    } else if (swipeOffset.x < -SWIPE_THRESHOLD) {
+      // Swipe Left - Falsch
+      await handleAnswer(false);
+    }
+    
+    // Reset position
+    setSwipeOffset({ x: 0, y: 0 });
+  };
+
   const startStudyMode = () => {
     const due = getDueFlashcards();
     if (due.length > 0) {
@@ -254,17 +293,52 @@ const Flashcards: React.FC = () => {
         </div>
 
         {/* Study Card */}
-        <div className="flex justify-center items-center min-h-[500px]">
+        <div className="flex justify-center items-center min-h-[500px] relative">
+          {/* Swipe Indicators - nur sichtbar wenn geflipped */}
+          {isFlipped && (
+            <>
+              <div 
+                className="absolute -left-20 top-1/2 -translate-y-1/2 text-6xl pointer-events-none transition-all duration-200"
+                style={{ 
+                  opacity: swipeOffset.x < -50 ? Math.min((Math.abs(swipeOffset.x) - 50) / 100, 1) : 0,
+                  transform: `translateY(-50%) scale(${swipeOffset.x < -50 ? 1 + (Math.abs(swipeOffset.x) - 50) / 200 : 1})`
+                } as React.CSSProperties}
+              >
+                ❌
+              </div>
+              <div 
+                className="absolute -right-20 top-1/2 -translate-y-1/2 text-6xl pointer-events-none transition-all duration-200"
+                style={{ 
+                  opacity: swipeOffset.x > 50 ? Math.min((swipeOffset.x - 50) / 100, 1) : 0,
+                  transform: `translateY(-50%) scale(${swipeOffset.x > 50 ? 1 + (swipeOffset.x - 50) / 200 : 1})`
+                } as React.CSSProperties}
+              >
+                ✅
+              </div>
+            </>
+          )}
+          
           <div 
             className={`w-full max-w-md ${
               slideAnimation === 'slide-out-left' ? 'animate-slide-out-left' :
               slideAnimation === 'slide-out-right' ? 'animate-slide-out-right' :
               slideAnimation === 'slide-in' ? 'animate-slide-in' : ''
             }`}
+            onMouseDown={(e) => handleSwipeStart(e.clientX, e.clientY)}
+            onMouseMove={(e) => handleSwipeMove(e.clientX, e.clientY)}
+            onMouseUp={handleSwipeEnd}
+            onMouseLeave={handleSwipeEnd}
+            onTouchStart={(e) => handleSwipeStart(e.touches[0].clientX, e.touches[0].clientY)}
+            onTouchMove={(e) => handleSwipeMove(e.touches[0].clientX, e.touches[0].clientY)}
+            onTouchEnd={handleSwipeEnd}
+            style={{
+              transform: isFlipped ? `translateX(${swipeOffset.x}px) translateY(${swipeOffset.y * 0.3}px) rotate(${swipeOffset.x * 0.05}deg)` : 'none',
+              transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+            } as React.CSSProperties}
           >
             <div 
-              className="perspective-1000 cursor-pointer group"
-              onClick={() => setIsFlipped(!isFlipped)}
+              className={`perspective-1000 group ${isFlipped && !isDragging ? 'cursor-grab' : isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
+              onClick={() => !isDragging && setIsFlipped(!isFlipped)}
             >
               <div 
                 className={`relative w-full h-96 transition-transform duration-700 ease-out preserve-3d ${
@@ -302,9 +376,10 @@ const Flashcards: React.FC = () => {
 
                 {/* Back Side */}
                 <div className="absolute inset-0 w-full h-full backface-hidden [transform:rotateY(180deg)]">
-                  <div className="w-full h-full bg-gradient-to-br from-green-500 via-emerald-600 to-teal-500 rounded-3xl shadow-2xl p-8 flex flex-col justify-center items-center text-white">
+                  <div className="w-full h-full bg-gradient-to-br from-green-500 via-emerald-600 to-teal-500 rounded-3xl shadow-2xl p-8 flex flex-col justify-center items-center text-white select-none">
                     <div className="text-xs font-semibold uppercase tracking-wider opacity-75 mb-3">Deutsch</div>
-                    <div className="text-5xl font-bold text-center">{currentCard.de}</div>
+                    <div className="text-5xl font-bold text-center mb-8">{currentCard.de}</div>
+                    <div className="text-sm opacity-75 animate-pulse">👆 Wischen oder Klicken</div>
                   </div>
                 </div>
               </div>

@@ -273,7 +273,7 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
               {/* Dropdown Menu */}
               {isLevelDropdownOpen && (
                 <div className="absolute z-50 w-full mt-2 bg-white border-2 border-primary-200 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
-                  <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+                  <div className="max-h-[300px] overflow-y-auto">
                     {LANGUAGE_LEVELS.map((lvl) => (
                       <button
                         key={lvl.level}
@@ -349,7 +349,7 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
                 {/* Dropdown Menu */}
                 {isEntryDropdownOpen && (
                   <div className="absolute z-50 w-full mt-2 bg-white border-2 border-neutral-200 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
-                    <div className="max-h-[40vh] overflow-y-auto custom-scrollbar">
+                    <div className="max-h-[300px] overflow-y-auto">
                       {savedEntries.map((entry) => (
                         <button
                           key={entry.id}
