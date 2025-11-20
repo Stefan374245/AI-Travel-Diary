@@ -1,7 +1,142 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SavedFlashcard } from '../types';
 import { loadFlashcards, reviewFlashcard } from '../services/flashcardService';
 import { useToast } from '../contexts/ToastContext';
+import './FlashcardQuiz.css';
+
+// 🎊 Konfetti Komponente
+const Confetti: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const particles: Array<{
+      x: number;
+      y: number;
+      size: number;
+      speedY: number;
+      speedX: number;
+      color: string;
+      rotation: number;
+      rotationSpeed: number;
+    }> = [];
+
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff6b6b', '#4ecdc4', '#45b7d1', '#ffa07a'];
+
+    // Erstelle Konfetti-Partikel
+    for (let i = 0; i < 100; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height - canvas.height,
+        size: Math.random() * 8 + 4,
+        speedY: Math.random() * 3 + 2,
+        speedX: Math.random() * 2 - 1,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rotation: Math.random() * 360,
+        rotationSpeed: Math.random() * 10 - 5,
+      });
+    }
+
+    let animationId: number;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      particles.forEach((p) => {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        ctx.restore();
+
+        p.y += p.speedY;
+        p.x += p.speedX;
+        p.rotation += p.rotationSpeed;
+
+        // Reset wenn außerhalb
+        if (p.y > canvas.height) {
+          p.y = -20;
+          p.x = Math.random() * canvas.width;
+        }
+      });
+
+      animationId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 pointer-events-none z-50"
+      style={{ width: '100%', height: '100%' }}
+    />
+  );
+};
+
+// 🎯 Progress Ring Komponente
+const ProgressRing: React.FC<{ progress: number; size?: number }> = ({ progress, size = 120 }) => {
+  const strokeWidth = 8;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (progress / 100) * circumference;
+
+  return (
+    <div className="relative inline-flex items-center justify-center">
+      <svg width={size} height={size} className="transform -rotate-90">
+        {/* Background circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          fill="none"
+          className="text-slate-200"
+        />
+        {/* Progress circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="text-gradient transition-all duration-500 ease-out"
+          style={{
+            stroke: 'url(#gradient)',
+            strokeLinecap: 'round',
+          }}
+        />
+        <defs>
+          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style={{ stopColor: '#8b5cf6', stopOpacity: 1 }} />
+            <stop offset="50%" style={{ stopColor: '#ec4899', stopOpacity: 1 }} />
+            <stop offset="100%" style={{ stopColor: '#f97316', stopOpacity: 1 }} />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-2xl font-black text-slate-700">{Math.round(progress)}%</span>
+      </div>
+    </div>
+  );
+};
 
 interface FlashcardQuizProps {
   onQuizComplete?: () => void;
@@ -23,6 +158,23 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
     cardId: string; // Karten-ID für Leitner-Update
   }>>([]);
   const [answeredCards, setAnsweredCards] = useState<Array<{ cardId: string; correct: boolean }>>([]);
+  
+  // ⚡ Streak Counter
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [showStreakBadge, setShowStreakBadge] = useState(false);
+  
+  // 💪 Power-Ups
+  const [fiftyFiftyUsed, setFiftyFiftyUsed] = useState(false);
+  const [doublePointsActive, setDoublePointsActive] = useState(false);
+  const [hiddenOptions, setHiddenOptions] = useState<string[]>([]);
+  
+  // 🎊 Konfetti
+  const [showConfetti, setShowConfetti] = useState(false);
+  
+  // ✅❌ Feedback Animation
+  const [animationState, setAnimationState] = useState<'correct' | 'wrong' | null>(null);
+  
   const toast = useToast();
 
   useEffect(() => {
@@ -97,7 +249,15 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
     setCurrentQuestionIndex(0);
     setScore(0);
     setShowResult(false);
-    setAnsweredCards([]); // Reset answered cards
+    setAnsweredCards([]);
+    // Reset Gamification
+    setCurrentStreak(0);
+    setBestStreak(0);
+    setFiftyFiftyUsed(false);
+    setDoublePointsActive(false);
+    setHiddenOptions([]);
+    setShowConfetti(false);
+    setAnimationState(null);
   };
 
   const handleAnswer = (answer: string) => {
@@ -106,8 +266,34 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
     const currentQuestion = quizQuestions[currentQuestionIndex];
     const isCorrect = answer === currentQuestion.correct;
     
+    // ✅❌ Feedback Animation
+    setAnimationState(isCorrect ? 'correct' : 'wrong');
+    
     if (isCorrect) {
-      setScore(score + 1);
+      // ⚡ Streak Counter
+      const newStreak = currentStreak + 1;
+      setCurrentStreak(newStreak);
+      if (newStreak > bestStreak) {
+        setBestStreak(newStreak);
+      }
+      
+      // Zeige Streak Badge bei Meilensteinen
+      if (newStreak % 3 === 0 && newStreak > 0) {
+        setShowStreakBadge(true);
+        setTimeout(() => setShowStreakBadge(false), 2000);
+      }
+      
+      // 💪 Double Points
+      const points = doublePointsActive ? 2 : 1;
+      setScore(score + points);
+      
+      if (doublePointsActive) {
+        toast.success(`+${points} Punkte! 🔥 Double Points aktiv!`);
+        setDoublePointsActive(false);
+      }
+    } else {
+      // ⚡ Streak zurücksetzen bei falscher Antwort
+      setCurrentStreak(0);
     }
 
     // Speichere Antwort für Leitner-Update
@@ -117,9 +303,11 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
     }]);
 
     setTimeout(() => {
+      setAnimationState(null);
       if (currentQuestionIndex < quizQuestions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setSelectedAnswer(null);
+        setHiddenOptions([]); // Reset hidden options
       } else {
         // Quiz beendet - Update Leitner-System
         finishQuiz();
@@ -139,12 +327,37 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
     reviewFlashcard(lastQuestion.cardId, lastCorrect);
     
     setShowResult(true);
+    // 🎊 Konfetti beim Quiz-Ende
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 5000);
+    
     toast.success(`Quiz abgeschlossen! ${answeredCards.length + 1} Karten im Leitner-System aktualisiert 🎯`);
     
     // Callback aufrufen, um Parent-Komponente zu refreshen
     if (onQuizComplete) {
       onQuizComplete();
     }
+  };
+
+  // 💪 Power-Up: 50:50 Joker
+  const useFiftyFifty = () => {
+    if (fiftyFiftyUsed || selectedAnswer) return;
+    
+    const currentQuestion = quizQuestions[currentQuestionIndex];
+    const wrongOptions = currentQuestion.options.filter(opt => opt !== currentQuestion.correct);
+    
+    // Entferne 2 zufällige falsche Antworten
+    const toHide = wrongOptions.sort(() => Math.random() - 0.5).slice(0, 2);
+    setHiddenOptions(toHide);
+    setFiftyFiftyUsed(true);
+    toast.success('50:50 Joker aktiviert! 🎯');
+  };
+
+  // 💪 Power-Up: Double Points
+  const useDoublePoints = () => {
+    if (doublePointsActive || selectedAnswer) return;
+    setDoublePointsActive(true);
+    toast.success('Double Points aktiviert! Nächste richtige Antwort = 2 Punkte! 🔥');
   };
 
   const restartQuiz = () => {
@@ -234,26 +447,56 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
     const isGood = percentage >= 70;
 
     return (
-      <div className="space-y-6">
-        <div className={`p-12 rounded-3xl shadow-2xl text-white text-center ${
-          isGood 
-            ? 'bg-gradient-to-br from-green-500 via-emerald-600 to-teal-500' 
-            : 'bg-gradient-to-br from-orange-500 via-red-500 to-pink-500'
-        }`}>
-          <div className="text-8xl mb-6">{isGood ? '🎉' : '💪'}</div>
-          <h2 className="text-5xl font-black mb-4">
-            {isGood ? '¡Excelente!' : '¡Sigue practicando!'}
-          </h2>
-          <div className="text-7xl font-black mb-6">{score} / {quizQuestions.length}</div>
-          <div className="text-3xl font-bold mb-8">{percentage}%</div>
-          
-          <button
-            onClick={restartQuiz}
-            className="group relative overflow-hidden bg-white text-slate-800 px-12 py-5 rounded-2xl font-bold text-xl shadow-xl hover:shadow-2xl transition-all transform hover:scale-105"
-          >
-            <span className="relative z-10">🔄 Neues Quiz starten</span>
-            <div className="absolute inset-0 bg-gradient-to-r from-white/80 to-white transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
-          </button>
+      <div className="space-y-6 relative">
+        {/* 🎊 Konfetti */}
+        {showConfetti && <Confetti />}
+        
+        {/* 🏆 Trophy Animation */}
+        <div className="animate-trophy-rise">
+          <div className={`p-12 rounded-3xl shadow-2xl text-white text-center relative overflow-hidden ${
+            isGood 
+              ? 'bg-gradient-to-br from-green-500 via-emerald-600 to-teal-500' 
+              : 'bg-gradient-to-br from-orange-500 via-red-500 to-pink-500'
+          }`}>
+            {/* Glitzer Effekt */}
+            <div className="absolute inset-0 animate-pulse">
+              {[...Array(20)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-1 h-1 bg-white rounded-full animate-twinkle"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    top: `${Math.random() * 100}%`,
+                    animationDelay: `${Math.random() * 2}s`,
+                  } as React.CSSProperties}
+                />
+              ))}
+            </div>
+            
+            <div className="relative z-10">
+              <div className="text-8xl mb-6 animate-bounce">{isGood ? '🏆' : '💪'}</div>
+              <h2 className="text-5xl font-black mb-4">
+                {isGood ? '¡Excelente!' : '¡Sigue practicando!'}
+              </h2>
+              <div className="text-7xl font-black mb-6">{score} / {quizQuestions.length}</div>
+              <div className="text-3xl font-bold mb-4">{percentage}%</div>
+              
+              {/* Best Streak */}
+              {bestStreak > 0 && (
+                <div className="inline-block px-6 py-3 bg-white/20 backdrop-blur-lg rounded-2xl mb-6">
+                  <div className="text-2xl font-bold">🔥 Best Streak: {bestStreak}</div>
+                </div>
+              )}
+              
+              <button
+                onClick={restartQuiz}
+                className="group relative overflow-hidden bg-white text-slate-800 px-12 py-5 rounded-2xl font-bold text-xl shadow-xl hover:shadow-2xl transition-all transform hover:scale-105"
+              >
+                <span className="relative z-10">🔄 Neues Quiz starten</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-white/80 to-white transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -263,20 +506,72 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
   const progress = ((currentQuestionIndex + 1) / quizQuestions.length) * 100;
 
   return (
-    <div className="space-y-6">
-      {/* Progress */}
-      <div className="bg-white p-4 rounded-2xl shadow-lg">
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-sm font-bold text-slate-700">
-            Frage {currentQuestionIndex + 1} / {quizQuestions.length}
-          </span>
-          <span className="text-sm text-slate-500">Score: {score}</span>
+    <div className={`space-y-6 relative ${animationState === 'correct' ? 'animate-pulse-green' : animationState === 'wrong' ? 'animate-shake' : ''}`}>
+      {/* 🎊 Konfetti */}
+      {showConfetti && <Confetti />}
+      
+      {/* ⚡ Streak Badge */}
+      {showStreakBadge && (
+        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-bounce-in">
+          <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-12 py-8 rounded-3xl shadow-2xl text-center">
+            <div className="text-6xl mb-4">🔥</div>
+            <div className="text-4xl font-black">{currentStreak} in Folge!</div>
+            <div className="text-xl mt-2">PERFEKT!</div>
+          </div>
         </div>
-        <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
-          <div 
-            className="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-full transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+      )}
+
+      {/* Progress Ring + Stats */}
+      <div className="bg-white p-6 rounded-2xl shadow-lg">
+        <div className="flex items-center justify-between gap-6">
+          {/* Progress Ring */}
+          <div className="flex-shrink-0">
+            <ProgressRing progress={progress} size={100} />
+          </div>
+          
+          {/* Stats */}
+          <div className="flex-1 grid grid-cols-3 gap-4 text-center">
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-3 rounded-xl">
+              <div className="text-2xl font-black text-purple-600">{score}</div>
+              <div className="text-xs text-slate-600">Punkte</div>
+            </div>
+            <div className="bg-gradient-to-br from-orange-50 to-red-50 p-3 rounded-xl">
+              <div className="text-2xl font-black text-orange-600">🔥 {currentStreak}</div>
+              <div className="text-xs text-slate-600">Streak</div>
+            </div>
+            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-3 rounded-xl">
+              <div className="text-2xl font-black text-blue-600">{currentQuestionIndex + 1}/{quizQuestions.length}</div>
+              <div className="text-xs text-slate-600">Fragen</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* 💪 Power-Ups */}
+        <div className="mt-4 flex gap-3">
+          <button
+            onClick={useFiftyFifty}
+            disabled={fiftyFiftyUsed || selectedAnswer !== null}
+            className={`flex-1 px-4 py-3 rounded-xl font-bold text-sm transition-all transform hover:scale-105 ${
+              fiftyFiftyUsed 
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                : 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg hover:shadow-xl'
+            }`}
+          >
+            {fiftyFiftyUsed ? '✓ 50:50 Verwendet' : '🎯 50:50 Joker'}
+          </button>
+          <button
+            onClick={useDoublePoints}
+            disabled={doublePointsActive || selectedAnswer !== null}
+            className={`flex-1 px-4 py-3 rounded-xl font-bold text-sm transition-all transform hover:scale-105 ${
+              doublePointsActive 
+                ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg animate-pulse' 
+                : selectedAnswer !== null
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg hover:shadow-xl'
+            }`}
+          >
+            {doublePointsActive ? '⚡ AKTIV!' : '🔥 2x Punkte'}
+          </button>
         </div>
       </div>
 
@@ -311,29 +606,45 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
             const isSelected = selectedAnswer === option;
             const isCorrect = option === currentQuestion.correct;
             const showFeedback = selectedAnswer !== null;
+            const isHidden = hiddenOptions.includes(option);
+
+            if (isHidden) {
+              return (
+                <div key={index} className="p-8 rounded-2xl bg-slate-100 opacity-30 relative">
+                  <div className="absolute inset-0 flex items-center justify-center text-4xl">❌</div>
+                </div>
+              );
+            }
 
             return (
               <button
                 key={index}
                 onClick={() => !selectedAnswer && handleAnswer(option)}
                 disabled={selectedAnswer !== null}
-                className={`group relative overflow-hidden p-8 rounded-2xl font-bold text-xl transition-all duration-300 transform hover:scale-105 disabled:cursor-not-allowed ${
+                className={`group relative overflow-hidden p-8 rounded-2xl font-bold text-xl transition-all duration-300 transform disabled:cursor-not-allowed ${
                   !showFeedback 
-                    ? 'bg-white hover:bg-gradient-to-br hover:from-indigo-50 hover:to-purple-50 text-slate-800 shadow-lg hover:shadow-2xl' 
+                    ? 'bg-white hover:bg-gradient-to-br hover:from-indigo-50 hover:to-purple-50 text-slate-800 shadow-lg hover:shadow-2xl hover:scale-105' 
                     : isSelected && isCorrect 
-                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-2xl scale-105' 
+                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-2xl scale-110 animate-pulse-green' 
                     : isSelected && !isCorrect 
-                    ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-2xl' 
+                    ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-2xl animate-shake' 
                     : isCorrect 
-                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-2xl' 
+                    ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-2xl scale-105' 
                     : 'bg-slate-200 text-slate-400'
                 }`}
               >
                 <span className="relative z-10 flex items-center justify-center gap-3">
-                  {showFeedback && isCorrect && '✅'}
-                  {showFeedback && isSelected && !isCorrect && '❌'}
+                  {showFeedback && isCorrect && <span className="text-4xl animate-checkmark">✅</span>}
+                  {showFeedback && isSelected && !isCorrect && <span className="text-4xl">❌</span>}
                   {option}
                 </span>
+                
+                {/* Glow Effekt */}
+                {showFeedback && isSelected && (
+                  <div className={`absolute inset-0 ${
+                    isCorrect ? 'bg-green-400' : 'bg-red-400'
+                  } opacity-20 blur-xl animate-pulse`}></div>
+                )}
               </button>
             );
           })}
