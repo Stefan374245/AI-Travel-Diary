@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { analyzeImage } from '../services/geminiService';
-import { ImageAnalysisResult, SavedEntry } from '../types';
+import { ImageAnalysisResult, SavedEntry, Coordinates } from '../types';
 import Quiz from './Quiz';
 import { UploadIcon } from './icons/UploadIcon';
 import { SparklesIcon } from './icons/SparklesIcon';
@@ -15,12 +15,22 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [location, setLocation] = useState<string>('');
+  const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
+  const [citySearchInput, setCitySearchInput] = useState<string>('');
+  const [gettingLocation, setGettingLocation] = useState<boolean>(false);
   const [result, setResult] = useState<ImageAnalysisResult | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const toast = useToast();
+
+  // Automatisch Ort aus Analyse übernehmen
+  useEffect(() => {
+    if (result?.location && !location) {
+      setLocation(result.location);
+    }
+  }, [result]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -43,10 +53,139 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
         imagePreview,
         location,
         analysisResult: result,
+        coordinates: coordinates || undefined,
       };
       onSaveEntry(entryData);
       setIsSaved(true);
       toast.success('Reiseeintrag wurde gespeichert! 🎉');
+    }
+  };
+
+  const handleAutoLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation wird von deinem Browser nicht unterstützt');
+      return;
+    }
+
+    setGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setCoordinates(coords);
+        
+        // Reverse Geocoding: Koordinaten → Stadt/Adresse
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&zoom=18&addressdetails=1`,
+            {
+              headers: {
+                'Accept-Language': 'de' // Deutsche Ortsnamen bevorzugen
+              }
+            }
+          );
+          const data = await response.json();
+          
+          if (data && data.address) {
+            // Formatiere Adresse: Präziseste verfügbare Information verwenden
+            const address = data.address;
+            const parts = [];
+            
+            // Priorität: municipality/town/village > suburb > city
+            if (address.municipality) {
+              parts.push(address.municipality);
+            } else if (address.town || address.village) {
+              parts.push(address.town || address.village);
+            } else if (address.city) {
+              parts.push(address.city);
+            } else if (address.suburb) {
+              parts.push(address.suburb);
+            }
+            
+            // Füge Region/Provinz hinzu falls vorhanden und anders als Stadt
+            if (address.state && !parts.includes(address.state)) {
+              parts.push(address.state);
+            }
+            
+            if (address.country) {
+              parts.push(address.country);
+            }
+            
+            const locationName = parts.join(', ') || data.display_name;
+            setLocation(locationName);
+            setCitySearchInput(locationName);
+            toast.success(`📍 Standort erkannt: ${parts[0] || 'Unbekannt'}. Du kannst den Ort bei Bedarf anpassen.`);
+          } else {
+            toast.success('Standort erfolgreich ermittelt! 📍 Bitte überprüfe den Ortsnamen.');
+          }
+        } catch (error) {
+          console.error('Reverse Geocoding Fehler:', error);
+          toast.success('Koordinaten erfolgreich ermittelt! 📍 Bitte gib den Ortsnamen manuell ein.');
+        }
+        
+        setGettingLocation(false);
+      },
+      (error) => {
+        setGettingLocation(false);
+        let errorMessage = 'Standort konnte nicht ermittelt werden';
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Standortzugriff wurde verweigert. Bitte erlaube den Zugriff in deinen Browser-Einstellungen.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'Standortinformationen sind nicht verfügbar';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'Zeitüberschreitung bei der Standortermittlung';
+            break;
+        }
+        
+        toast.error(errorMessage);
+      },
+      {
+        enableHighAccuracy: true, // Höhere Genauigkeit aktivieren
+        timeout: 10000, // 10 Sekunden Timeout
+        maximumAge: 0 // Keine gecachten Positionen verwenden
+      }
+    );
+  };
+
+  const handleCitySearch = async () => {
+    if (!citySearchInput.trim()) {
+      toast.error('Bitte gib einen Städtenamen ein');
+      return;
+    }
+
+    setGettingLocation(true);
+    try {
+      // Nominatim Geocoding API (OpenStreetMap)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(citySearchInput)}&limit=1`
+      );
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const result = data[0];
+        setCoordinates({
+          lat: parseFloat(result.lat),
+          lng: parseFloat(result.lon),
+        });
+        // Optional: Ortsfeld mit gefundenem Namen aktualisieren
+        if (result.display_name) {
+          const parts = result.display_name.split(',');
+          setLocation(parts.slice(0, 2).join(',').trim());
+        }
+        toast.success('Stadt gefunden! 📍');
+      } else {
+        toast.error('Stadt nicht gefunden. Versuche es mit einem anderen Namen.');
+      }
+    } catch (error) {
+      toast.error('Fehler bei der Stadtsuche');
+    } finally {
+      setGettingLocation(false);
     }
   };
 
@@ -146,24 +285,90 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
               </div>
             </div>
 
-            {/* Location Input */}
-            <div>
-              <Text variant="label" as="label" htmlFor="location" className="block mb-2">
-                Ort
+            {/* Coordinates Input */}
+            <div className="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+              <Text variant="label" className="block mb-3">
+                Standort hinzufügen
               </Text>
-              <input
-                data-tutorial="location-input"
-                type="text"
-                name="location"
-                id="location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm text-base border-neutral-300 rounded-lg px-4 py-3 transition-colors duration-200"
-                placeholder="z.B. Barcelona, Spanien"
-              />
-              <Text variant="small" color="muted" className="mt-2">
-                Wo wurde das Foto aufgenommen?
-              </Text>
+              
+              <div className="space-y-3">
+                {/* Auto-detect location */}
+                <button
+                  type="button"
+                  onClick={handleAutoLocation}
+                  disabled={gettingLocation}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-neutral-300 rounded-lg text-sm font-medium text-neutral-700 bg-white hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {gettingLocation ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-neutral-700 border-t-transparent rounded-full animate-spin"></div>
+                      Standort wird ermittelt...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Aktuellen Standort verwenden
+                    </>
+                  )}
+                </button>
+
+                {/* City/Location search input */}
+                <div className="space-y-2">
+                  <Text variant="small" className="block mb-1 text-neutral-600">
+                    Stadt oder Adresse suchen
+                  </Text>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={citySearchInput}
+                      onChange={(e) => setCitySearchInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleCitySearch()}
+                      className="flex-1 px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="z.B. Barcelona, Paris, Berlin"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCitySearch}
+                      disabled={!citySearchInput.trim() || gettingLocation}
+                      className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    >
+                      {gettingLocation ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      )}
+                      Suchen
+                    </button>
+                  </div>
+                  <Text variant="small" color="muted">
+                    Gib eine Stadt oder Adresse ein, um Koordinaten automatisch zu finden
+                  </Text>
+                </div>
+
+                {/* Display current coordinates */}
+                {coordinates && (
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <div className="flex-1">
+                        <Text variant="small" className="font-medium text-green-800">
+                          Koordinaten gespeichert
+                        </Text>
+                        <Text variant="small" className="text-green-700 mt-1">
+                          {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
+                        </Text>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </Grid>
 
