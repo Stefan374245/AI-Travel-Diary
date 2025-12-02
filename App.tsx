@@ -4,6 +4,7 @@ import ImageAnalyzer from './components/image-analyzer/ImageAnalyzer';
 import Chat from './components/chat/Chat';
 import Diary from './components/diary/Diary';
 import Flashcards from './components/flashcards/Flashcards';
+import VocabularyImport from './components/vocabulary/VocabularyImport';
 import Legal from './components/shared/Legal';
 import Help from './components/shared/Help';
 import UserMenu from './components/shared/UserMenu';
@@ -13,6 +14,7 @@ import { CameraIcon } from './components/icons/CameraIcon';
 import { ChatBubbleIcon } from './components/icons/ChatBubbleIcon';
 import { BookOpenIcon } from './components/icons/BookOpenIcon';
 import { CardIcon } from './components/icons/CardIcon';
+import { VocabIcon } from './components/icons/VocabIcon';
 import { SavedEntry } from './types';
 import { useToast } from './contexts/ToastContext';
 import { useAuth } from './contexts/AuthContext';
@@ -22,7 +24,7 @@ import { loadDiaryEntries, saveDiaryEntry, deleteDiaryEntry, updateDiaryEntry, s
 import { subscribeToTrash, restoreFromTrash, permanentDelete, emptyTrash, TrashEntry } from './services/trashService';
 
 
-type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards' | 'legal' | 'help';
+type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards' | 'vocabulary' | 'legal' | 'help';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('analyzer');
@@ -175,7 +177,9 @@ const App: React.FC = () => {
           setExpandedEntryId={setExpandedEntryId} 
         />;
       case 'flashcards':
-        return <Flashcards />;
+        return <Flashcards savedEntries={savedEntries} />;
+      case 'vocabulary':
+        return <VocabularyImport />;
       case 'legal':
         return <Legal onBack={() => setActiveTab('analyzer')} />;
       case 'help':
@@ -238,6 +242,7 @@ const App: React.FC = () => {
                 <TabButton tabName="diary" label="Mein Tagebuch" icon={<BookOpenIcon />} />
                 <TabButton tabName="chat" label="Spanisch-Lern-Chat" icon={<ChatBubbleIcon />} />
                 <TabButton tabName="flashcards" label="Lernkarten" icon={<CardIcon />} />
+                <TabButton tabName="vocabulary" label="Vokabeln" icon={<VocabIcon />} />
               </div>
             </div>
           )}

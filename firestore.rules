@@ -37,6 +37,11 @@ service cloud.firestore {
       match /trash/{trashId} {
         allow read, write: if isOwner(userId);
       }
+      
+      // Vocabulary subcollection
+      match /vocabulary/{vocabId} {
+        allow read, write: if isOwner(userId);
+      }
     }
     
     // User settings/preferences
