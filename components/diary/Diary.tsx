@@ -2,26 +2,43 @@ import React, { useState } from 'react';
 import { SavedEntry, Flashcard, Coordinates } from '../../types';
 import Quiz from '../shared/Quiz';
 import TravelMap from './TravelMap';
+import Trash from '../trash/Trash';
 import { TrashIcon } from '../icons/TrashIcon';
 import { saveFlashcard, isFlashcardSaved, deleteFlashcardByText } from '../../services/flashcardService';
 import { useToast } from '../../contexts/ToastContext';
 import { Heading, Text, Stack, Card, Grid, Divider } from '../../design-system';
+import { TrashEntry } from '../../services/trashService';
 
 interface DiaryProps {
   entries: SavedEntry[];
+  trashEntries: TrashEntry[];
   onDeleteEntry: (id: string) => void;
   onUpdateEntry: (entry: SavedEntry) => void;
+  onRestoreEntry: (entry: TrashEntry) => void;
+  onPermanentDelete: (entryId: string) => void;
+  onEmptyTrash: () => void;
   expandedEntryId: string | null;
   setExpandedEntryId: (id: string | null) => void;
 }
 
-const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry, onUpdateEntry, expandedEntryId, setExpandedEntryId }) => {
+const Diary: React.FC<DiaryProps> = ({ 
+  entries, 
+  trashEntries,
+  onDeleteEntry, 
+  onUpdateEntry, 
+  onRestoreEntry,
+  onPermanentDelete,
+  onEmptyTrash,
+  expandedEntryId, 
+  setExpandedEntryId 
+}) => {
   const [editMode, setEditMode] = useState<{ [key: string]: boolean }>({});
   const [editLocation, setEditLocation] = useState<{ [key: string]: string }>({});
   const [editCitySearch, setEditCitySearch] = useState<{ [key: string]: string }>({});
   const [searchingLocation, setSearchingLocation] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list'); // Neu: Toggle zwischen Liste und Karte
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [showTrash, setShowTrash] = useState(false);
   const toast = useToast();
 
   const toggleExpand = (id: string) => {
@@ -164,31 +181,18 @@ const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry, onUpdateEntry, ex
   const handleDeleteClick = (e: React.MouseEvent, entryId: string) => {
     e.stopPropagation();
     setDeleteConfirmId(entryId);
-    toast.warning('Eintrag löschen? Klicke nochmal zum Bestätigen.', 5000);
   };
 
   const confirmDelete = (e: React.MouseEvent, entryId: string) => {
     e.stopPropagation();
     onDeleteEntry(entryId);
     setDeleteConfirmId(null);
-    toast.success('Eintrag wurde gelöscht! 🗑️');
   };
 
   const cancelDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     setDeleteConfirmId(null);
   };
-
-  if (entries.length === 0) {
-    return (
-      <Card variant="default" padding="lg" className="text-center">
-        <Stack spacing="sm">
-          <Heading level={3}>Dein Tagebuch ist leer.</Heading>
-          <Text color="muted">Erstelle deinen ersten Reiseeintrag, um ihn hier zu sehen!</Text>
-        </Stack>
-      </Card>
-    );
-  }
 
   const handleMarkerClick = (entry: SavedEntry) => {
     setViewMode('list');
@@ -200,10 +204,71 @@ const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry, onUpdateEntry, ex
     }, 100);
   };
 
+  if (showTrash) {
+    return (
+      <div>
+        <button
+          onClick={() => setShowTrash(false)}
+          className="mb-4 px-4 py-2 text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors inline-flex items-center gap-2"
+        >
+          ← Zurück zum Tagebuch
+        </button>
+        <Trash 
+          trashEntries={trashEntries} 
+          onRestore={onRestoreEntry} 
+          onPermanentDelete={onPermanentDelete} 
+          onEmptyTrash={onEmptyTrash} 
+        />
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <Stack spacing="lg">
+        <div className="flex items-center justify-between gap-4">
+          <Heading level={3}>Mein Tagebuch</Heading>
+          <button
+            onClick={() => setShowTrash(true)}
+            className="px-3 py-1.5 text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors inline-flex items-center gap-2"
+          >
+            <TrashIcon className="w-4 h-4" />
+            Papierkorb
+            {trashEntries.length > 0 && (
+              <span className="px-2 py-0.5 bg-error-100 text-error-700 rounded-full text-xs font-bold">
+                {trashEntries.length}
+              </span>
+            )}
+          </button>
+        </div>
+        <Card variant="default" padding="lg" className="text-center">
+          <Stack spacing="sm">
+            <Heading level={3}>Dein Tagebuch ist leer.</Heading>
+            <Text color="muted">Erstelle deinen ersten Reiseeintrag, um ihn hier zu sehen!</Text>
+          </Stack>
+        </Card>
+      </Stack>
+    );
+  }
+
   return (
     <Stack spacing="lg">
       <div className="flex items-center justify-between gap-4">
-        <Heading level={3}>Mein Tagebuch</Heading>
+        <div className="flex items-center gap-3">
+          <Heading level={3}>Mein Tagebuch</Heading>
+          <button
+            onClick={() => setShowTrash(true)}
+            className="px-3 py-1.5 text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors inline-flex items-center gap-2"
+          >
+            <TrashIcon className="w-4 h-4" />
+            Papierkorb
+            {trashEntries.length > 0 && (
+              <span className="px-2 py-0.5 bg-error-100 text-error-700 rounded-full text-xs font-bold">
+                {trashEntries.length}
+              </span>
+            )}
+          </button>
+        </div>
         
         {/* View Toggle */}
         <div className="flex gap-2 bg-neutral-100 p-1 rounded-xl">
@@ -532,6 +597,52 @@ const Diary: React.FC<DiaryProps> = ({ entries, onDeleteEntry, onUpdateEntry, ex
           )}
         </Card>
       ))
+      )}
+
+      {/* Delete Confirmation Overlay */}
+      {deleteConfirmId && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] animate-fade-in"
+          onClick={cancelDelete}
+        >
+          <Card 
+            variant="default" 
+            padding="lg" 
+            className="max-w-md mx-4 animate-scale-in"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <Stack spacing="md">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-error-100 flex items-center justify-center flex-shrink-0">
+                  <TrashIcon className="w-6 h-6 text-error-600" />
+                </div>
+                <div className="flex-1">
+                  <Heading level={4} className="mb-1">Eintrag löschen?</Heading>
+                  <Text variant="small" color="muted">
+                    Diese Aktion kann nicht rückgängig gemacht werden.
+                  </Text>
+                </div>
+              </div>
+              
+              <Divider />
+              
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={cancelDelete}
+                  className="px-4 py-2 text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={(e) => confirmDelete(e, deleteConfirmId)}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-error-600 hover:bg-error-700 rounded-lg transition-colors shadow-sm hover:shadow-md"
+                >
+                  Löschen
+                </button>
+              </div>
+            </Stack>
+          </Card>
+        </div>
       )}
     </Stack>
   );

@@ -19,6 +19,7 @@ import { useAuth } from './contexts/AuthContext';
 import { TutorialProvider, TutorialOverlay } from './components/tutorial';
 import TutorialButton from './components/tutorial/components/TutorialButton';
 import { loadDiaryEntries, saveDiaryEntry, deleteDiaryEntry, updateDiaryEntry, subscribeToDiaryEntries } from './services/diaryService';
+import { subscribeToTrash, restoreFromTrash, permanentDelete, emptyTrash, TrashEntry } from './services/trashService';
 
 
 type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards' | 'legal' | 'help';
@@ -26,6 +27,7 @@ type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards' | 'legal' | 'help';
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('analyzer');
   const [savedEntries, setSavedEntries] = useState<SavedEntry[]>([]);
+  const [trashEntries, setTrashEntries] = useState<TrashEntry[]>([]);
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [showSignUp, setShowSignUp] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -58,6 +60,25 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [currentUser, toast]);
 
+  // Load trash entries from Firestore
+  useEffect(() => {
+    if (!currentUser) {
+      setTrashEntries([]);
+      return;
+    }
+
+    const unsubscribe = subscribeToTrash(
+      (entries) => {
+        setTrashEntries(entries);
+      },
+      (error) => {
+        console.error('Error subscribing to trash:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
   const handleSaveEntry = async (newEntryData: Omit<SavedEntry, 'id' | 'timestamp'>) => {
     try {
       const newEntry = await saveDiaryEntry(newEntryData);
@@ -77,14 +98,42 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEntry = async (id: string) => {
-    if (window.confirm('Möchtest du diesen Eintrag wirklich löschen?')) {
-      try {
-        await deleteDiaryEntry(id);
-        toast.showToast('Eintrag gelöscht', 'success');
-      } catch (error) {
-        console.error('Error deleting entry:', error);
-        toast.showToast('Fehler beim Löschen des Eintrags', 'error');
-      }
+    try {
+      await deleteDiaryEntry(id);
+      toast.showToast('In den Papierkorb verschoben', 'info');
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      toast.showToast('Fehler beim Löschen des Eintrags', 'error');
+    }
+  };
+
+  const handleRestoreEntry = async (entry: TrashEntry) => {
+    try {
+      await restoreFromTrash(entry);
+      toast.showToast('Eintrag wiederhergestellt', 'success');
+    } catch (error) {
+      console.error('Error restoring entry:', error);
+      toast.showToast('Fehler beim Wiederherstellen', 'error');
+    }
+  };
+
+  const handlePermanentDelete = async (entryId: string) => {
+    try {
+      await permanentDelete(entryId);
+      toast.showToast('Eintrag endgültig gelöscht', 'success');
+    } catch (error) {
+      console.error('Error permanently deleting:', error);
+      toast.showToast('Fehler beim Löschen', 'error');
+    }
+  };
+
+  const handleEmptyTrash = async () => {
+    try {
+      await emptyTrash();
+      toast.showToast('Papierkorb geleert', 'success');
+    } catch (error) {
+      console.error('Error emptying trash:', error);
+      toast.showToast('Fehler beim Leeren des Papierkorbs', 'error');
     }
   };
 
@@ -114,7 +163,17 @@ const App: React.FC = () => {
       case 'chat':
         return <Chat savedEntries={savedEntries} />;
       case 'diary':
-        return <Diary entries={savedEntries} onDeleteEntry={handleDeleteEntry} onUpdateEntry={handleUpdateEntry} expandedEntryId={expandedEntryId} setExpandedEntryId={setExpandedEntryId} />;
+        return <Diary 
+          entries={savedEntries} 
+          trashEntries={trashEntries}
+          onDeleteEntry={handleDeleteEntry} 
+          onUpdateEntry={handleUpdateEntry} 
+          onRestoreEntry={handleRestoreEntry}
+          onPermanentDelete={handlePermanentDelete}
+          onEmptyTrash={handleEmptyTrash}
+          expandedEntryId={expandedEntryId} 
+          setExpandedEntryId={setExpandedEntryId} 
+        />;
       case 'flashcards':
         return <Flashcards />;
       case 'legal':
