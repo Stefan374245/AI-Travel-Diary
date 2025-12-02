@@ -8,6 +8,9 @@ import { SendIcon } from '../icons/SendIcon';
 import { SparklesIcon } from '../icons/SparklesIcon';
 import { SpeakerIcon } from '../icons/SpeakerIcon';
 import { Heading, Text, Stack, Card, Grid } from '../../design-system';
+import { getUserLanguageLevel, saveUserLanguageLevel } from '../../services/userPreferencesService';
+import { loadChatHistory, saveChatSession, deleteChatSession, SavedChat } from '../../services/chatHistoryService';
+import { useToast } from '../../contexts/ToastContext';
 
 interface ChatProps {
   savedEntries: SavedEntry[];
@@ -22,18 +25,16 @@ const LANGUAGE_LEVELS: LanguageLevelInfo[] = [
   { level: 'C2', label: 'C2 - Muttersprachlich', description: 'Nahezu muttersprachliche Beherrschung' }
 ];
 
-const STORAGE_KEY_LEVEL = 'spanish-learning-level';
-
 const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
-  const [languageLevel, setLanguageLevel] = useState<LanguageLevel>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_LEVEL);
-    return (saved as LanguageLevel) || 'A2';
-  });
+  const { showToast } = useToast();
+  const [languageLevel, setLanguageLevel] = useState<LanguageLevel>('A2');
   const [isLevelDropdownOpen, setIsLevelDropdownOpen] = useState(false);
   const [isEntryDropdownOpen, setIsEntryDropdownOpen] = useState(false);
+  const [isHistoryDropdownOpen, setIsHistoryDropdownOpen] = useState(false);
   const [selectedEntryId, setSelectedEntryId] = useState<string>('');
   const [speakingMessageIndex, setSpeakingMessageIndex] = useState<number | null>(null);
   const [isTTSSupported] = useState(() => ttsService.isSupported());
+  const [chatHistory, setChatHistory] = useState<SavedChat[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'model', parts: [{ text: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' }], response: { reply: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' } }
   ]);
@@ -45,13 +46,33 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const levelDropdownRef = useRef<HTMLDivElement>(null);
   const entryDropdownRef = useRef<HTMLDivElement>(null);
+  const historyDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Load language level from Firestore
+  useEffect(() => {
+    const loadLevel = async () => {
+      const level = await getUserLanguageLevel();
+      setLanguageLevel(level);
+    };
+    loadLevel();
+  }, []);
+
+  // Load chat history
+  useEffect(() => {
+    const loadHistory = async () => {
+      const history = await loadChatHistory();
+      setChatHistory(history);
+    };
+    loadHistory();
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Save language level to Firestore when it changes
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_LEVEL, languageLevel);
+    saveUserLanguageLevel(languageLevel);
   }, [languageLevel]);
 
   // Close dropdown when clicking outside
@@ -62,6 +83,9 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
       }
       if (entryDropdownRef.current && !entryDropdownRef.current.contains(event.target as Node)) {
         setIsEntryDropdownOpen(false);
+      }
+      if (historyDropdownRef.current && !historyDropdownRef.current.contains(event.target as Node)) {
+        setIsHistoryDropdownOpen(false);
       }
     };
 
@@ -78,6 +102,50 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
     setSelectedEntryId(entryId);
     setIsEntryDropdownOpen(false);
     handleImportEntry(entryId);
+  };
+
+  const handleSaveCurrentChat = async () => {
+    if (messages.length <= 1) {
+      showToast('Keine Nachrichten zum Speichern', 'info');
+      return;
+    }
+    
+    try {
+      await saveChatSession(messages, languageLevel);
+      const updatedHistory = await loadChatHistory();
+      setChatHistory(updatedHistory);
+      showToast('Chat gespeichert', 'success');
+    } catch (error) {
+      showToast('Fehler beim Speichern', 'error');
+    }
+  };
+
+  const handleLoadChat = (chat: SavedChat) => {
+    setMessages(chat.messages);
+    if (chat.languageLevel) {
+      setLanguageLevel(chat.languageLevel as LanguageLevel);
+    }
+    setIsHistoryDropdownOpen(false);
+    showToast('Chat geladen', 'success');
+  };
+
+  const handleDeleteChat = async (chatId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await deleteChatSession(chatId);
+      const updatedHistory = await loadChatHistory();
+      setChatHistory(updatedHistory);
+      showToast('Chat gelöscht', 'success');
+    } catch (error) {
+      showToast('Fehler beim Löschen', 'error');
+    }
+  };
+
+  const handleNewChat = () => {
+    setMessages([{ role: 'model', parts: [{ text: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' }], response: { reply: '¡Hola! ¿En qué puedo ayudarte hoy con tu español?' } }]);
+    setSelectedEntryId('');
+    setSelectedEntry(null);
+    showToast('Neuer Chat gestartet', 'info');
   };
 
   const getCurrentLevelInfo = () => {
@@ -392,6 +460,107 @@ const Chat: React.FC<ChatProps> = ({ savedEntries }) => {
               </div>
             </Stack>
           )}
+          
+          {/* Chat History Dropdown */}
+          <Stack spacing="xs" className="mt-2">
+            <div className="flex items-center justify-between">
+              <Text variant="label" color="secondary" as="label">
+                💬 Gespeicherte Chats:
+              </Text>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleNewChat}
+                  className="px-3 py-1 text-xs font-medium text-primary-700 bg-primary-100 hover:bg-primary-200 rounded-lg transition-colors"
+                >
+                  + Neu
+                </button>
+                <button
+                  onClick={handleSaveCurrentChat}
+                  className="px-3 py-1 text-xs font-medium text-success-700 bg-success-100 hover:bg-success-200 rounded-lg transition-colors"
+                >
+                  💾 Speichern
+                </button>
+              </div>
+            </div>
+            <div ref={historyDropdownRef} className="relative">
+              {/* Dropdown Button */}
+              <button
+                type="button"
+                onClick={() => setIsHistoryDropdownOpen(!isHistoryDropdownOpen)}
+                className="w-full flex items-center justify-between gap-3 text-sm border-2 border-neutral-200 bg-white rounded-xl shadow-sm px-4 py-3 will-change-[background-color,border-color,box-shadow] transition-[background-color,border-color,box-shadow] duration-300 ease-out hover:border-primary-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <span className={`truncate flex-1 text-left ${
+                  chatHistory.length > 0 ? 'text-neutral-900' : 'text-neutral-500'
+                }`}>
+                  {chatHistory.length > 0 ? `${chatHistory.length} gespeicherte Chat${chatHistory.length > 1 ? 's' : ''}` : 'Keine gespeicherten Chats'}
+                </span>
+                <svg 
+                  className={`h-5 w-5 text-neutral-500 transition-transform duration-300 flex-shrink-0 ${
+                    isHistoryDropdownOpen ? 'rotate-180' : ''
+                  }`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Dropdown Menu */}
+              {isHistoryDropdownOpen && chatHistory.length > 0 && (
+                <div className="absolute z-50 w-full mt-2 bg-white border-2 border-neutral-200 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {chatHistory.map((chat) => (
+                      <button
+                        key={chat.id}
+                        type="button"
+                        onClick={() => handleLoadChat(chat)}
+                        className="w-full text-left px-4 py-3 transition-colors duration-150 ease-in-out border-b border-neutral-100 last:border-b-0 hover:bg-primary-50 focus:outline-none focus:bg-primary-100 border-l-4 border-l-transparent hover:border-l-primary-300 group"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm truncate text-neutral-900 group-hover:text-primary-800">
+                                {chat.title}
+                              </span>
+                              {chat.languageLevel && (
+                                <span className="px-1.5 py-0.5 text-xs font-semibold bg-primary-100 text-primary-700 rounded">
+                                  {chat.languageLevel}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-neutral-600">
+                                {new Date(chat.timestamp).toLocaleDateString('de-DE', { 
+                                  year: 'numeric', 
+                                  month: 'short', 
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                              <span className="text-xs text-neutral-500">
+                                • {chat.messages.length} Nachricht{chat.messages.length > 1 ? 'en' : ''}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => handleDeleteChat(chat.id, e)}
+                            className="flex-shrink-0 p-1.5 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded transition-colors"
+                            aria-label="Chat löschen"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Stack>
         </Stack>
       </div>
       {selectedEntry && (
