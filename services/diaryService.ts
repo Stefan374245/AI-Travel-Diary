@@ -14,6 +14,7 @@ import {
   QuerySnapshot
 } from 'firebase/firestore';
 import { SavedEntry } from '../types';
+import { moveToTrash } from './trashService';
 
 const COLLECTION_NAME = 'diaryEntries';
 
@@ -91,16 +92,25 @@ export const updateDiaryEntry = async (entry: SavedEntry): Promise<void> => {
 };
 
 /**
- * Delete a diary entry
+ * Delete a diary entry (moves to trash)
  */
 export const deleteDiaryEntry = async (entryId: string): Promise<void> => {
   try {
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
 
+    // Load the entry first
     const diaryCollection = getUserDiaryCollection();
     const docRef = doc(diaryCollection, entryId);
-    await deleteDoc(docRef);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const entry = { id: docSnap.id, ...docSnap.data() } as SavedEntry;
+      // Move to trash instead of permanent delete
+      await moveToTrash(entry);
+    } else {
+      throw new Error('Entry not found');
+    }
   } catch (error) {
     console.error('Error deleting diary entry:', error);
     throw error;
