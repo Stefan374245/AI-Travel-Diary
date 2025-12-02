@@ -7,6 +7,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { TutorialContextValue, TutorialState, TutorialStep } from '../types';
 import { tutorialSteps } from '../data/tutorialSteps';
 import { tutorialService } from '../services/tutorialService';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const TutorialContext = createContext<TutorialContextValue | undefined>(undefined);
 
@@ -15,29 +16,19 @@ interface TutorialProviderProps {
   autoStart?: boolean; // Auto-start tutorial if not seen before
 }
 
-export const TutorialProvider: React.FC<TutorialProviderProps> = ({ 
-  children, 
-  autoStart = true 
+export const TutorialProvider: React.FC<TutorialProviderProps> = ({
+  children,
+  autoStart = true
 }) => {
+  const { currentUser } = useAuth();
   const [state, setState] = useState<TutorialState>({
     isActive: false,
     currentStepIndex: 0,
     currentStep: null,
     totalSteps: tutorialSteps.length,
-    hasCompletedTutorial: tutorialService.hasSeenTutorial(),
+    hasCompletedTutorial: false,
     isSkipped: false,
   });
-
-  // Auto-start tutorial on mount if not seen before
-  useEffect(() => {
-    if (autoStart && !tutorialService.hasSeenTutorial()) {
-      // Small delay to let the app render first
-      const timer = setTimeout(() => {
-        startTutorial();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [autoStart]);
 
   const startTutorial = useCallback(async () => {
     // Execute beforeStep of first step
@@ -50,15 +41,36 @@ export const TutorialProvider: React.FC<TutorialProviderProps> = ({
       }
     }
 
-    setState({
+    setState(prev => ({
+      ...prev,
       isActive: true,
       currentStepIndex: 0,
       currentStep: tutorialSteps[0],
       totalSteps: tutorialSteps.length,
       hasCompletedTutorial: false,
       isSkipped: false,
-    });
+    }));
   }, []);
+
+  // Check tutorial status on mount or user change
+  useEffect(() => {
+    const checkTutorialStatus = async () => {
+      if (currentUser) {
+        const seen = await tutorialService.hasSeenTutorial();
+        setState(prev => ({ ...prev, hasCompletedTutorial: seen }));
+
+        if (autoStart && !seen) {
+          // Small delay to let the app render first
+          const timer = setTimeout(() => {
+            startTutorial();
+          }, 1000);
+          return () => clearTimeout(timer);
+        }
+      }
+    };
+
+    checkTutorialStatus();
+  }, [currentUser, autoStart, startTutorial]);
 
   const nextStep = useCallback(async () => {
     // Execute afterStep of current step
@@ -72,10 +84,10 @@ export const TutorialProvider: React.FC<TutorialProviderProps> = ({
     }
 
     const nextIndex = state.currentStepIndex + 1;
-    
+
     if (nextIndex >= tutorialSteps.length) {
       // Tutorial complete
-      tutorialService.markAsCompleted();
+      await tutorialService.markAsCompleted();
       setState(prev => ({
         ...prev,
         isActive: false,
@@ -103,7 +115,7 @@ export const TutorialProvider: React.FC<TutorialProviderProps> = ({
 
   const prevStep = useCallback(async () => {
     const prevIndex = Math.max(0, state.currentStepIndex - 1);
-    
+
     // Execute beforeStep of previous step
     const prevStepData = tutorialSteps[prevIndex];
     if (prevStepData?.beforeStep) {
@@ -113,7 +125,7 @@ export const TutorialProvider: React.FC<TutorialProviderProps> = ({
         console.error('Error in beforeStep:', error);
       }
     }
-    
+
     setState(prev => ({
       ...prev,
       currentStepIndex: prevIndex,
@@ -121,8 +133,8 @@ export const TutorialProvider: React.FC<TutorialProviderProps> = ({
     }));
   }, [state.currentStepIndex]);
 
-  const skipTutorial = useCallback(() => {
-    tutorialService.markAsSkipped();
+  const skipTutorial = useCallback(async () => {
+    await tutorialService.markAsSkipped();
     setState(prev => ({
       ...prev,
       isActive: false,
@@ -130,8 +142,8 @@ export const TutorialProvider: React.FC<TutorialProviderProps> = ({
     }));
   }, []);
 
-  const completeTutorial = useCallback(() => {
-    tutorialService.markAsCompleted();
+  const completeTutorial = useCallback(async () => {
+    await tutorialService.markAsCompleted();
     setState(prev => ({
       ...prev,
       isActive: false,
@@ -139,8 +151,8 @@ export const TutorialProvider: React.FC<TutorialProviderProps> = ({
     }));
   }, []);
 
-  const restartTutorial = useCallback(() => {
-    tutorialService.resetTutorial();
+  const restartTutorial = useCallback(async () => {
+    await tutorialService.resetTutorial();
     startTutorial();
   }, [startTutorial]);
 

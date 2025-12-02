@@ -12,12 +12,16 @@ type ViewMode = 'browse' | 'study' | 'quiz';
 type FilterBox = 'all' | 1 | 2 | 3 | 4 | 5;
 type SortMode = 'recent' | 'alphabetical' | 'box';
 
-const Flashcards: React.FC = () => {
+interface FlashcardsProps {
+  savedEntries?: SavedEntry[];
+}
+
+const Flashcards: React.FC<FlashcardsProps> = ({ savedEntries = [] }) => {
   const [flashcards, setFlashcards] = useState<SavedFlashcard[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('browse');
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [stats, setStats] = useState(getFlashcardStats());
+  const [stats, setStats] = useState({ total: 0, box1: 0, box2: 0, box3: 0, box4: 0, box5: 0, due: 0 });
   const [studyCards, setStudyCards] = useState<SavedFlashcard[]>([]);
   const [slideAnimation, setSlideAnimation] = useState<'slide-out-left' | 'slide-out-right' | 'slide-in' | null>(null);
   const [flippedBrowseCards, setFlippedBrowseCards] = useState<Set<string>>(new Set());
@@ -27,17 +31,17 @@ const Flashcards: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [speakingCardId, setSpeakingCardId] = useState<string | null>(null);
   const [isTTSSupported] = useState(() => ttsService.isSupported());
-  
+
   // 🎮 Swipe Mechanik für Study Mode
   const [swipeOffset, setSwipeOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  
+
   const toast = useToast();
 
   useEffect(() => {
     refreshCards();
-    
+
     // Cleanup TTS on unmount
     return () => {
       ttsService.stop();
@@ -47,22 +51,22 @@ const Flashcards: React.FC = () => {
   // Filtered and sorted flashcards
   const filteredCards = useMemo(() => {
     let result = [...flashcards];
-    
+
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(card => 
-        card.es.toLowerCase().includes(query) || 
+      result = result.filter(card =>
+        card.es.toLowerCase().includes(query) ||
         card.de.toLowerCase().includes(query) ||
         (card.location && card.location.toLowerCase().includes(query))
       );
     }
-    
+
     // Box filter
     if (filterBox !== 'all') {
       result = result.filter(card => card.box === filterBox);
     }
-    
+
     // Sort
     switch (sortMode) {
       case 'alphabetical':
@@ -76,31 +80,23 @@ const Flashcards: React.FC = () => {
         // Already in recent order from loadFlashcards
         break;
     }
-    
+
     return result;
   }, [flashcards, searchQuery, filterBox, sortMode]);
 
-  // Funktion zum Laden der Reiseeinträge aus localStorage
+  // Funktion zum Laden der Reiseeinträge
   const getImageForCard = (card: SavedFlashcard): string | null => {
     if (!card.entryId) return null;
-    try {
-      const storedEntries = localStorage.getItem('diaryEntries');
-      if (storedEntries) {
-        const entries: SavedEntry[] = JSON.parse(storedEntries);
-        const entry = entries.find(e => e.id === card.entryId);
-        return entry?.imagePreview || null;
-      }
-    } catch (error) {
-      console.error('Fehler beim Laden des Bildes:', error);
-    }
-    return null;
+    const entry = savedEntries.find(e => e.id === card.entryId);
+    return entry?.imagePreview || null;
   };
 
-  const refreshCards = () => {
-    const cards = loadFlashcards();
+  const refreshCards = async () => {
+    const cards = await loadFlashcards();
     setFlashcards(cards);
-    setStats(getFlashcardStats());
-    const due = getDueFlashcards();
+    const newStats = await getFlashcardStats();
+    setStats(newStats);
+    const due = await getDueFlashcards();
     setStudyCards(due);
   };
 
@@ -130,26 +126,26 @@ const Flashcards: React.FC = () => {
 
   const handleAnswer = async (correct: boolean) => {
     if (studyCards.length === 0) return;
-    
+
     // Stop any playing audio
     ttsService.stop();
     setSpeakingCardId(null);
-    
+
     const currentCard = studyCards[currentCardIndex];
-    
+
     // Slide out animation
     setSlideAnimation(correct ? 'slide-out-right' : 'slide-out-left');
-    
+
     await new Promise(resolve => setTimeout(resolve, 500));
-    
-    reviewFlashcard(currentCard.id, correct);
-    
+
+    await reviewFlashcard(currentCard.id, correct);
+
     // Move to next card or finish
     if (currentCardIndex < studyCards.length - 1) {
       setSlideAnimation('slide-in');
       setCurrentCardIndex(prev => prev + 1);
       setIsFlipped(false);
-      
+
       setTimeout(() => setSlideAnimation(null), 500);
     } else {
       // All cards done
@@ -157,7 +153,7 @@ const Flashcards: React.FC = () => {
       setCurrentCardIndex(0);
       setSlideAnimation(null);
     }
-    
+
     refreshCards();
   };
 
@@ -178,9 +174,9 @@ const Flashcards: React.FC = () => {
   const handleSwipeEnd = async () => {
     if (!isDragging || !isFlipped) return;
     setIsDragging(false);
-    
+
     const SWIPE_THRESHOLD = 120;
-    
+
     // Swipe Right = Richtig, Swipe Left = Falsch
     if (swipeOffset.x > SWIPE_THRESHOLD) {
       // Swipe Right - Richtig
@@ -189,13 +185,13 @@ const Flashcards: React.FC = () => {
       // Swipe Left - Falsch
       await handleAnswer(false);
     }
-    
+
     // Reset position
     setSwipeOffset({ x: 0, y: 0 });
   };
 
-  const startStudyMode = () => {
-    const due = getDueFlashcards();
+  const startStudyMode = async () => {
+    const due = await getDueFlashcards();
     if (due.length > 0) {
       ttsService.stop();
       setSpeakingCardId(null);
@@ -208,11 +204,11 @@ const Flashcards: React.FC = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Möchtest du diese Lernkarte wirklich löschen?')) {
-      deleteFlashcard(id);
+      await deleteFlashcard(id);
       refreshCards();
-      toast.success('Lernkarte wurde gelöscht');
+      toast.showToast('Lernkarte wurde gelöscht', 'success');
     }
   };
 
@@ -285,7 +281,7 @@ const Flashcards: React.FC = () => {
             <span className="text-sm text-slate-500">{currentCardIndex + 1} / {studyCards.length}</span>
           </div>
           <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full transition-all duration-500 ease-out"
               style={{ width: `${progress}%` }}
             />
@@ -297,18 +293,18 @@ const Flashcards: React.FC = () => {
           {/* Swipe Indicators - nur sichtbar wenn geflipped */}
           {isFlipped && (
             <>
-              <div 
+              <div
                 className="absolute -left-20 top-1/2 -translate-y-1/2 text-6xl pointer-events-none transition-all duration-200"
-                style={{ 
+                style={{
                   opacity: swipeOffset.x < -50 ? Math.min((Math.abs(swipeOffset.x) - 50) / 100, 1) : 0,
                   transform: `translateY(-50%) scale(${swipeOffset.x < -50 ? 1 + (Math.abs(swipeOffset.x) - 50) / 200 : 1})`
                 } as React.CSSProperties}
               >
                 ❌
               </div>
-              <div 
+              <div
                 className="absolute -right-20 top-1/2 -translate-y-1/2 text-6xl pointer-events-none transition-all duration-200"
-                style={{ 
+                style={{
                   opacity: swipeOffset.x > 50 ? Math.min((swipeOffset.x - 50) / 100, 1) : 0,
                   transform: `translateY(-50%) scale(${swipeOffset.x > 50 ? 1 + (swipeOffset.x - 50) / 200 : 1})`
                 } as React.CSSProperties}
@@ -317,13 +313,12 @@ const Flashcards: React.FC = () => {
               </div>
             </>
           )}
-          
-          <div 
-            className={`w-full max-w-md ${
-              slideAnimation === 'slide-out-left' ? 'animate-slide-out-left' :
-              slideAnimation === 'slide-out-right' ? 'animate-slide-out-right' :
-              slideAnimation === 'slide-in' ? 'animate-slide-in' : ''
-            }`}
+
+          <div
+            className={`w-full max-w-md ${slideAnimation === 'slide-out-left' ? 'animate-slide-out-left' :
+                slideAnimation === 'slide-out-right' ? 'animate-slide-out-right' :
+                  slideAnimation === 'slide-in' ? 'animate-slide-in' : ''
+              }`}
             onMouseDown={(e) => handleSwipeStart(e.clientX, e.clientY)}
             onMouseMove={(e) => handleSwipeMove(e.clientX, e.clientY)}
             onMouseUp={handleSwipeEnd}
@@ -336,14 +331,13 @@ const Flashcards: React.FC = () => {
               transition: isDragging ? 'none' : 'transform 0.3s ease-out'
             } as React.CSSProperties}
           >
-            <div 
+            <div
               className={`perspective-1000 group ${isFlipped && !isDragging ? 'cursor-grab' : isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
               onClick={() => !isDragging && setIsFlipped(!isFlipped)}
             >
-              <div 
-                className={`relative w-full h-96 transition-transform duration-700 ease-out preserve-3d ${
-                  isFlipped ? '[transform:rotateY(180deg)]' : ''
-                }`}
+              <div
+                className={`relative w-full h-96 transition-transform duration-700 ease-out preserve-3d ${isFlipped ? '[transform:rotateY(180deg)]' : ''
+                  }`}
               >
                 {/* Front Side */}
                 <div className="absolute inset-0 w-full h-full backface-hidden">
@@ -358,12 +352,11 @@ const Flashcards: React.FC = () => {
                         aria-label={speakingCardId === `study-${currentCard.id}` ? 'Stoppen' : 'Anhören'}
                         title="Spanisch vorlesen"
                       >
-                        <SpeakerIcon 
-                          className={`w-6 h-6 ${
-                            speakingCardId === `study-${currentCard.id}` 
-                              ? 'text-white' 
+                        <SpeakerIcon
+                          className={`w-6 h-6 ${speakingCardId === `study-${currentCard.id}`
+                              ? 'text-white'
                               : 'text-white/80 group-hover/speaker:text-white'
-                          }`}
+                            }`}
                           isPlaying={speakingCardId === `study-${currentCard.id}`}
                         />
                       </button>
@@ -484,11 +477,10 @@ const Flashcards: React.FC = () => {
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 ${
-                showFilters 
-                  ? 'bg-primary-600 text-white shadow-lg' 
+              className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 ${showFilters
+                  ? 'bg-primary-600 text-white shadow-lg'
                   : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-              }`}
+                }`}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -508,11 +500,10 @@ const Flashcards: React.FC = () => {
                       <button
                         key={box}
                         onClick={() => setFilterBox(box)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                          filterBox === box
+                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${filterBox === box
                             ? 'bg-primary-600 text-white shadow-md scale-105'
                             : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                        }`}
+                          }`}
                       >
                         {box === 'all' ? 'Alle' : `Box ${box}`}
                       </button>
@@ -530,11 +521,10 @@ const Flashcards: React.FC = () => {
                       <button
                         key={sort.value}
                         onClick={() => setSortMode(sort.value)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                          sortMode === sort.value
+                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${sortMode === sort.value
                             ? 'bg-primary-600 text-white shadow-md scale-105'
                             : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                        }`}
+                          }`}
                       >
                         {sort.label}
                       </button>
@@ -545,22 +535,22 @@ const Flashcards: React.FC = () => {
             </div>
           )}
 
-        {/* Box Statistics */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3" data-tutorial="flashcard-stats">
-          {[
-            { label: 'Box 1', value: stats.box1, color: 'from-error-500 to-error-600', desc: '1 Tag' },
-            { label: 'Box 2', value: stats.box2, color: 'from-warning-500 to-warning-600', desc: '2 Tage' },
-            { label: 'Box 3', value: stats.box3, color: 'from-yellow-500 to-yellow-600', desc: '5 Tage' },
-            { label: 'Box 4', value: stats.box4, color: 'from-success-500 to-success-600', desc: '10 Tage' },
-            { label: 'Box 5', value: stats.box5, color: 'from-primary-500 to-primary-600', desc: '30 Tage' }
-          ].map((box, i) => (
-            <div key={i} className={`bg-gradient-to-br ${box.color} p-4 rounded-xl text-white shadow-md hover:shadow-lg transition-all transform hover:scale-105 cursor-pointer`}>
-              <div className="text-3xl font-bold">{box.value}</div>
-              <div className="text-xs font-medium opacity-90">{box.label}</div>
-              <div className="text-xs opacity-75">{box.desc}</div>
-            </div>
-          ))}
-        </div>
+          {/* Box Statistics */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3" data-tutorial="flashcard-stats">
+            {[
+              { label: 'Box 1', value: stats.box1, color: 'from-error-500 to-error-600', desc: '1 Tag' },
+              { label: 'Box 2', value: stats.box2, color: 'from-warning-500 to-warning-600', desc: '2 Tage' },
+              { label: 'Box 3', value: stats.box3, color: 'from-yellow-500 to-yellow-600', desc: '5 Tage' },
+              { label: 'Box 4', value: stats.box4, color: 'from-success-500 to-success-600', desc: '10 Tage' },
+              { label: 'Box 5', value: stats.box5, color: 'from-primary-500 to-primary-600', desc: '30 Tage' }
+            ].map((box, i) => (
+              <div key={i} className={`bg-gradient-to-br ${box.color} p-4 rounded-xl text-white shadow-md hover:shadow-lg transition-all transform hover:scale-105 cursor-pointer`}>
+                <div className="text-3xl font-bold">{box.value}</div>
+                <div className="text-xs font-medium opacity-90">{box.label}</div>
+                <div className="text-xs opacity-75">{box.desc}</div>
+              </div>
+            ))}
+          </div>
         </Stack>
       </Card>
 
@@ -598,10 +588,10 @@ const Flashcards: React.FC = () => {
         {filteredCards.map((card) => {
           const isCardFlipped = flippedBrowseCards.has(card.id);
           const cardImage = getImageForCard(card);
-          
+
           return (
             <div key={card.id} className="group relative">
-              <div 
+              <div
                 className="perspective-1000 cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -616,19 +606,18 @@ const Flashcards: React.FC = () => {
                   });
                 }}
               >
-                <div 
-                  className={`relative h-64 rounded-3xl shadow-xl hover:shadow-3xl transition-all duration-700 preserve-3d ${
-                    isCardFlipped ? '[transform:rotateY(180deg)]' : ''
-                  }`}
+                <div
+                  className={`relative h-64 rounded-3xl shadow-xl hover:shadow-3xl transition-all duration-700 preserve-3d ${isCardFlipped ? '[transform:rotateY(180deg)]' : ''
+                    }`}
                 >
                   {/* Front Side - Spanisch */}
                   <div className="absolute inset-0 w-full h-full backface-hidden rounded-3xl overflow-hidden">
                     {/* Background Image with Gradient Overlay */}
                     {cardImage ? (
                       <div className="absolute inset-0">
-                        <img 
-                          src={cardImage} 
-                          alt={card.location || 'Reisebild'} 
+                        <img
+                          src={cardImage}
+                          alt={card.location || 'Reisebild'}
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/90 via-pink-500/85 to-orange-500/80 mix-blend-multiply"></div>
@@ -639,13 +628,12 @@ const Flashcards: React.FC = () => {
                     )}
 
                     {/* Box Badge */}
-                    <div className={`absolute top-4 right-4 w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-2xl backdrop-blur-sm ${
-                      card.box === 1 ? 'bg-red-500/80' :
-                      card.box === 2 ? 'bg-orange-500/80' :
-                      card.box === 3 ? 'bg-yellow-500/80' :
-                      card.box === 4 ? 'bg-green-500/80' :
-                      'bg-blue-500/80'
-                    }`}>
+                    <div className={`absolute top-4 right-4 w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-2xl backdrop-blur-sm ${card.box === 1 ? 'bg-red-500/80' :
+                        card.box === 2 ? 'bg-orange-500/80' :
+                          card.box === 3 ? 'bg-yellow-500/80' :
+                            card.box === 4 ? 'bg-green-500/80' :
+                              'bg-blue-500/80'
+                      }`}>
                       {card.box}
                     </div>
 
@@ -668,12 +656,11 @@ const Flashcards: React.FC = () => {
                           aria-label={speakingCardId === card.id ? 'Stoppen' : 'Anhören'}
                           title="Spanisch vorlesen"
                         >
-                          <SpeakerIcon 
-                            className={`w-5 h-5 ${
-                              speakingCardId === card.id 
-                                ? 'text-white' 
+                          <SpeakerIcon
+                            className={`w-5 h-5 ${speakingCardId === card.id
+                                ? 'text-white'
                                 : 'text-white/80 group-hover/speaker:text-white'
-                            }`}
+                              }`}
                             isPlaying={speakingCardId === card.id}
                           />
                         </button>
@@ -693,13 +680,12 @@ const Flashcards: React.FC = () => {
                     <div className="absolute inset-0 bg-gradient-to-br from-green-500 via-emerald-600 to-teal-500"></div>
 
                     {/* Box Badge on back */}
-                    <div className={`absolute top-4 right-4 w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-2xl backdrop-blur-sm ${
-                      card.box === 1 ? 'bg-red-500/80' :
-                      card.box === 2 ? 'bg-orange-500/80' :
-                      card.box === 3 ? 'bg-yellow-500/80' :
-                      card.box === 4 ? 'bg-green-500/80' :
-                      'bg-blue-500/80'
-                    }`}>
+                    <div className={`absolute top-4 right-4 w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-2xl backdrop-blur-sm ${card.box === 1 ? 'bg-red-500/80' :
+                        card.box === 2 ? 'bg-orange-500/80' :
+                          card.box === 3 ? 'bg-yellow-500/80' :
+                            card.box === 4 ? 'bg-green-500/80' :
+                              'bg-blue-500/80'
+                      }`}>
                       {card.box}
                     </div>
 

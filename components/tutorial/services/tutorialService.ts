@@ -1,20 +1,23 @@
-/**
- * Tutorial Service - LocalStorage Management
- * Handles tutorial state persistence
- */
+import { db, auth } from '../../../services/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-const TUTORIAL_STORAGE_KEY = 'ai-travel-diary-tutorial-completed';
-const TUTORIAL_SKIPPED_KEY = 'ai-travel-diary-tutorial-skipped';
+const COLLECTION = 'userSettings';
 
 export const tutorialService = {
   /**
    * Check if user has completed or skipped the tutorial
    */
-  hasSeenTutorial(): boolean {
+  async hasSeenTutorial(): Promise<boolean> {
+    const user = auth.currentUser;
+    if (!user) return false;
     try {
-      const completed = localStorage.getItem(TUTORIAL_STORAGE_KEY);
-      const skipped = localStorage.getItem(TUTORIAL_SKIPPED_KEY);
-      return completed === 'true' || skipped === 'true';
+      const docRef = doc(db, COLLECTION, user.uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        return data.tutorialCompleted === true || data.tutorialSkipped === true;
+      }
+      return false;
     } catch (error) {
       console.error('Error reading tutorial state:', error);
       return false;
@@ -24,10 +27,12 @@ export const tutorialService = {
   /**
    * Mark tutorial as completed
    */
-  markAsCompleted(): void {
+  async markAsCompleted(): Promise<void> {
+    const user = auth.currentUser;
+    if (!user) return;
     try {
-      localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
-      localStorage.removeItem(TUTORIAL_SKIPPED_KEY);
+      const docRef = doc(db, COLLECTION, user.uid);
+      await setDoc(docRef, { tutorialCompleted: true }, { merge: true });
     } catch (error) {
       console.error('Error saving tutorial completion:', error);
     }
@@ -36,10 +41,12 @@ export const tutorialService = {
   /**
    * Mark tutorial as skipped
    */
-  markAsSkipped(): void {
+  async markAsSkipped(): Promise<void> {
+    const user = auth.currentUser;
+    if (!user) return;
     try {
-      localStorage.setItem(TUTORIAL_SKIPPED_KEY, 'true');
-      localStorage.removeItem(TUTORIAL_STORAGE_KEY);
+      const docRef = doc(db, COLLECTION, user.uid);
+      await setDoc(docRef, { tutorialSkipped: true }, { merge: true });
     } catch (error) {
       console.error('Error saving tutorial skip:', error);
     }
@@ -48,10 +55,12 @@ export const tutorialService = {
   /**
    * Reset tutorial state (for testing or user request)
    */
-  resetTutorial(): void {
+  async resetTutorial(): Promise<void> {
+    const user = auth.currentUser;
+    if (!user) return;
     try {
-      localStorage.removeItem(TUTORIAL_STORAGE_KEY);
-      localStorage.removeItem(TUTORIAL_SKIPPED_KEY);
+      const docRef = doc(db, COLLECTION, user.uid);
+      await setDoc(docRef, { tutorialCompleted: false, tutorialSkipped: false }, { merge: true });
     } catch (error) {
       console.error('Error resetting tutorial:', error);
     }

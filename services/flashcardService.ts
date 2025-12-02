@@ -1,6 +1,8 @@
 import { SavedFlashcard, Flashcard } from '../types';
+import { db, auth } from './firebase';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
 
-const STORAGE_KEY = 'savedFlashcards';
+const COLLECTION_NAME = 'flashcards';
 
 /**
  * Berechnet das nächste Review-Datum basierend auf der Box
@@ -13,40 +15,36 @@ const calculateNextReview = (box: number): string => {
 };
 
 /**
- * Lädt alle gespeicherten Lernkarten aus LocalStorage
+ * Lädt alle gespeicherten Lernkarten aus Firestore
  */
-export const loadFlashcards = (): SavedFlashcard[] => {
+export const loadFlashcards = async (): Promise<SavedFlashcard[]> => {
+  const user = auth.currentUser;
+  if (!user) return [];
+
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const cards = JSON.parse(stored);
-      // Migration: Alte Karten ohne box-System aktualisieren
-      return cards.map((card: SavedFlashcard) => ({
-        ...card,
-        box: card.box || 1,
-        lastReviewed: card.lastReviewed || null,
-        nextReview: card.nextReview || calculateNextReview(1),
-        reviewCount: card.reviewCount || 0,
-      }));
-    }
+    const q = query(collection(db, COLLECTION_NAME), where('userId', '==', user.uid));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedFlashcard));
   } catch (error) {
     console.error('Fehler beim Laden der Lernkarten:', error);
+    return [];
   }
-  return [];
 };
 
 /**
  * Speichert eine neue Lernkarte
  */
-export const saveFlashcard = (
+export const saveFlashcard = async (
   flashcard: Flashcard, 
   category?: string,
   entryData?: { entryId: string; imageUrl: string; location: string }
-): SavedFlashcard => {
+): Promise<SavedFlashcard | null> => {
+  const user = auth.currentUser;
+  if (!user) return null;
+
   const now = new Date().toISOString();
-  const savedCard: SavedFlashcard = {
+  const newCardData = {
     ...flashcard,
-    id: now + Math.random(),
     timestamp: now,
     category,
     box: 1,
@@ -55,102 +53,118 @@ export const saveFlashcard = (
     reviewCount: 0,
     entryId: entryData?.entryId,
     location: entryData?.location,
+    userId: user.uid
     // imageUrl NICHT speichern - wird dynamisch aus savedEntries geladen
   };
 
-  const existingCards = loadFlashcards();
-  
-  // Prüfe, ob die Karte bereits existiert (gleicher spanischer Text)
-  const duplicate = existingCards.find(card => card.es === flashcard.es);
-  if (duplicate) {
-    return duplicate;
-  }
+  try {
+    // Prüfe, ob die Karte bereits existiert (gleicher spanischer Text)
+    const existingCards = await loadFlashcards();
+    const duplicate = existingCards.find(card => card.es === flashcard.es);
+    if (duplicate) {
+      return duplicate;
+    }
 
-  const updatedCards = [savedCard, ...existingCards];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCards));
-  
-  return savedCard;
+    const docRef = await addDoc(collection(db, COLLECTION_NAME), newCardData);
+    return { ...newCardData, id: docRef.id } as SavedFlashcard;
+  } catch (error) {
+    console.error('Fehler beim Speichern der Lernkarte:', error);
+    return null;
+  }
 };
 
 /**
  * Löscht eine Lernkarte anhand ihrer ID
  */
-export const deleteFlashcard = (id: string): void => {
-  const cards = loadFlashcards();
-  const filtered = cards.filter(card => card.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+export const deleteFlashcard = async (id: string): Promise<void> => {
+  try {
+    await deleteDoc(doc(db, COLLECTION_NAME, id));
+  } catch (error) {
+    console.error('Fehler beim Löschen der Lernkarte:', error);
+  }
 };
 
 /**
  * Prüft, ob eine Lernkarte bereits gespeichert ist
  */
-export const isFlashcardSaved = (flashcard: Flashcard): boolean => {
-  const cards = loadFlashcards();
+export const isFlashcardSaved = async (flashcard: Flashcard): Promise<boolean> => {
+  const cards = await loadFlashcards();
   return cards.some(card => card.es === flashcard.es);
 };
 
 /**
  * Löscht eine Lernkarte anhand des spanischen Textes
  */
-export const deleteFlashcardByText = (spanishText: string): void => {
-  const cards = loadFlashcards();
-  const filtered = cards.filter(card => card.es !== spanishText);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+export const deleteFlashcardByText = async (spanishText: string): Promise<void> => {
+  const cards = await loadFlashcards();
+  const cardToDelete = cards.find(card => card.es === spanishText);
+  if (cardToDelete) {
+    await deleteFlashcard(cardToDelete.id);
+  }
 };
 
 /**
  * Zählt die Anzahl gespeicherter Lernkarten
  */
-export const getFlashcardCount = (): number => {
-  return loadFlashcards().length;
+export const getFlashcardCount = async (): Promise<number> => {
+  const cards = await loadFlashcards();
+  return cards.length;
 };
 
 /**
  * Aktualisiert eine Lernkarte nach dem Review (richtig oder falsch)
  */
-export const reviewFlashcard = (id: string, correct: boolean): void => {
-  const cards = loadFlashcards();
-  const updatedCards = cards.map(card => {
-    if (card.id === id) {
+export const reviewFlashcard = async (id: string, correct: boolean): Promise<void> => {
+  try {
+    const docRef = doc(db, COLLECTION_NAME, id);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const card = docSnap.data() as SavedFlashcard;
       const now = new Date().toISOString();
+      let updates = {};
+
       if (correct) {
         // Richtig: Box erhöhen (max 5) und reviewCount erhöhen
         const newBox = Math.min(card.box + 1, 5);
-        return {
-          ...card,
+        updates = {
           box: newBox,
           lastReviewed: now,
           nextReview: calculateNextReview(newBox),
-          reviewCount: card.reviewCount + 1,
+          reviewCount: (card.reviewCount || 0) + 1,
         };
       } else {
         // Falsch: Zurück zu Box 1
-        return {
-          ...card,
+        updates = {
           box: 1,
           lastReviewed: now,
           nextReview: calculateNextReview(1),
         };
       }
+      
+      await updateDoc(docRef, updates);
     }
-    return card;
-  });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCards));
+  } catch (error) {
+    console.error('Fehler beim Aktualisieren der Lernkarte:', error);
+  }
 };
 
 /**
  * Gibt alle fälligen Karten zurück (nextReview <= jetzt)
  */
-export const getDueFlashcards = (): SavedFlashcard[] => {
+export const getDueFlashcards = async (): Promise<SavedFlashcard[]> => {
   const now = new Date();
-  return loadFlashcards().filter(card => new Date(card.nextReview) <= now);
+  const cards = await loadFlashcards();
+  return cards.filter(card => new Date(card.nextReview) <= now);
 };
 
 /**
  * Statistik: Anzahl Karten pro Box
  */
-export const getFlashcardStats = () => {
-  const cards = loadFlashcards();
+export const getFlashcardStats = async () => {
+  const cards = await loadFlashcards();
+  const dueCards = await getDueFlashcards();
+  
   const stats = {
     total: cards.length,
     box1: cards.filter(c => c.box === 1).length,
@@ -158,7 +172,7 @@ export const getFlashcardStats = () => {
     box3: cards.filter(c => c.box === 3).length,
     box4: cards.filter(c => c.box === 4).length,
     box5: cards.filter(c => c.box === 5).length,
-    due: getDueFlashcards().length,
+    due: dueCards.length,
   };
   return stats;
 };
