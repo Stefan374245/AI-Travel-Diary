@@ -58,19 +58,12 @@ export const TutorialProvider: React.FC<TutorialProviderProps> = ({
       if (currentUser) {
         const seen = await tutorialService.hasSeenTutorial();
         setState(prev => ({ ...prev, hasCompletedTutorial: seen }));
-
-        if (autoStart && !seen) {
-          // Small delay to let the app render first
-          const timer = setTimeout(() => {
-            startTutorial();
-          }, 1000);
-          return () => clearTimeout(timer);
-        }
+        // Auto-start removed - tutorial only starts via manual button click
       }
     };
 
     checkTutorialStatus();
-  }, [currentUser, autoStart, startTutorial]);
+  }, [currentUser]);
 
   const nextStep = useCallback(async () => {
     // Execute afterStep of current step
