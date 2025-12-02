@@ -1,8 +1,17 @@
 import { SavedFlashcard, Flashcard } from '../types';
 import { db, auth } from './firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
 
 const COLLECTION_NAME = 'flashcards';
+
+/**
+ * Get user's flashcard collection reference
+ */
+const getUserFlashcardCollection = () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  return collection(db, 'users', user.uid, COLLECTION_NAME);
+};
 
 /**
  * Berechnet das nächste Review-Datum basierend auf der Box
@@ -18,12 +27,12 @@ const calculateNextReview = (box: number): string => {
  * Lädt alle gespeicherten Lernkarten aus Firestore
  */
 export const loadFlashcards = async (): Promise<SavedFlashcard[]> => {
-  const user = auth.currentUser;
-  if (!user) return [];
-
   try {
-    const q = query(collection(db, COLLECTION_NAME), where('userId', '==', user.uid));
-    const snapshot = await getDocs(q);
+    const user = auth.currentUser;
+    if (!user) return [];
+
+    const flashcardCollection = getUserFlashcardCollection();
+    const snapshot = await getDocs(flashcardCollection);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedFlashcard));
   } catch (error) {
     console.error('Fehler beim Laden der Lernkarten:', error);
@@ -39,25 +48,24 @@ export const saveFlashcard = async (
   category?: string,
   entryData?: { entryId: string; imageUrl: string; location: string }
 ): Promise<SavedFlashcard | null> => {
-  const user = auth.currentUser;
-  if (!user) return null;
-
-  const now = new Date().toISOString();
-  const newCardData = {
-    ...flashcard,
-    timestamp: now,
-    category,
-    box: 1,
-    lastReviewed: null,
-    nextReview: calculateNextReview(1),
-    reviewCount: 0,
-    entryId: entryData?.entryId,
-    location: entryData?.location,
-    userId: user.uid
-    // imageUrl NICHT speichern - wird dynamisch aus savedEntries geladen
-  };
-
   try {
+    const user = auth.currentUser;
+    if (!user) return null;
+
+    const now = new Date().toISOString();
+    const newCardData = {
+      ...flashcard,
+      timestamp: now,
+      category,
+      box: 1,
+      lastReviewed: null,
+      nextReview: calculateNextReview(1),
+      reviewCount: 0,
+      entryId: entryData?.entryId,
+      location: entryData?.location
+      // imageUrl NICHT speichern - wird dynamisch aus savedEntries geladen
+    };
+
     // Prüfe, ob die Karte bereits existiert (gleicher spanischer Text)
     const existingCards = await loadFlashcards();
     const duplicate = existingCards.find(card => card.es === flashcard.es);
@@ -65,7 +73,8 @@ export const saveFlashcard = async (
       return duplicate;
     }
 
-    const docRef = await addDoc(collection(db, COLLECTION_NAME), newCardData);
+    const flashcardCollection = getUserFlashcardCollection();
+    const docRef = await addDoc(flashcardCollection, newCardData);
     return { ...newCardData, id: docRef.id } as SavedFlashcard;
   } catch (error) {
     console.error('Fehler beim Speichern der Lernkarte:', error);
@@ -78,7 +87,11 @@ export const saveFlashcard = async (
  */
 export const deleteFlashcard = async (id: string): Promise<void> => {
   try {
-    await deleteDoc(doc(db, COLLECTION_NAME, id));
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
+    const docRef = doc(db, 'users', user.uid, COLLECTION_NAME, id);
+    await deleteDoc(docRef);
   } catch (error) {
     console.error('Fehler beim Löschen der Lernkarte:', error);
   }
@@ -116,7 +129,10 @@ export const getFlashcardCount = async (): Promise<number> => {
  */
 export const reviewFlashcard = async (id: string, correct: boolean): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION_NAME, id);
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+    
+    const docRef = doc(db, 'users', user.uid, COLLECTION_NAME, id);
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
@@ -175,4 +191,42 @@ export const getFlashcardStats = async () => {
     due: dueCards.length,
   };
   return stats;
+};
+
+/**
+ * Subscribe to flashcards with real-time updates
+ */
+export const subscribeToFlashcards = (
+  onUpdate: (flashcards: SavedFlashcard[]) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.warn('No authenticated user for flashcard subscription');
+      return () => {};
+    }
+
+    const flashcardCollection = getUserFlashcardCollection();
+    
+    const unsubscribe = onSnapshot(
+      flashcardCollection,
+      (snapshot) => {
+        const flashcards = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as SavedFlashcard));
+        onUpdate(flashcards);
+      },
+      (error) => {
+        console.error('Error in flashcard subscription:', error);
+        if (onError) onError(error as Error);
+      }
+    );
+
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error setting up flashcard subscription:', error);
+    return () => {};
+  }
 };
