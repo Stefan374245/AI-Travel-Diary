@@ -53,18 +53,25 @@ export const saveFlashcard = async (
     if (!user) return null;
 
     const now = new Date().toISOString();
-    const newCardData = {
+    const newCardData: any = {
       ...flashcard,
       timestamp: now,
-      category,
       box: 1,
       lastReviewed: null,
       nextReview: calculateNextReview(1),
-      reviewCount: 0,
-      entryId: entryData?.entryId,
-      location: entryData?.location
-      // imageUrl NICHT speichern - wird dynamisch aus savedEntries geladen
+      reviewCount: 0
     };
+
+    // Nur definierte optionale Felder hinzufügen
+    if (category !== undefined) {
+      newCardData.category = category;
+    }
+    if (entryData?.entryId !== undefined) {
+      newCardData.entryId = entryData.entryId;
+    }
+    if (entryData?.location !== undefined) {
+      newCardData.location = entryData.location;
+    }
 
     // Prüfe, ob die Karte bereits existiert (gleicher spanischer Text)
     const existingCards = await loadFlashcards();

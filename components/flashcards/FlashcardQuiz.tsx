@@ -48,8 +48,11 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
   const toast = useToast();
 
   useEffect(() => {
-    const cards = loadFlashcards();
-    setFlashcards(cards);
+    const fetchCards = async () => {
+      const cards = await loadFlashcards();
+      setFlashcards(cards);
+    };
+    fetchCards();
   }, []);
 
   const generateQuiz = (numQuestions: number = 10) => {
@@ -232,7 +235,7 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
     toast.success('Double Points aktiviert! Nächste richtige Antwort = 2 Punkte! 🔥');
   };
 
-  const restartQuiz = () => {
+  const restartQuiz = async () => {
     setQuizStarted(false);
     setCurrentQuestionIndex(0);
     setScore(0);
@@ -240,7 +243,7 @@ const FlashcardQuiz: React.FC<FlashcardQuizProps> = ({ onQuizComplete }) => {
     setSelectedAnswer(null);
     setAnsweredCards([]);
     // Lade Flashcards neu, um aktualisierte Box-Werte zu zeigen
-    const cards = loadFlashcards();
+    const cards = await loadFlashcards();
     setFlashcards(cards);
   };
 
