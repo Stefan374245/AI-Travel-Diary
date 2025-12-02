@@ -1,0 +1,161 @@
+import { db, auth } from './firebase';
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  deleteDoc, 
+  updateDoc,
+  query,
+  orderBy,
+  Timestamp,
+  onSnapshot,
+  QuerySnapshot
+} from 'firebase/firestore';
+import { SavedEntry } from '../types';
+
+const COLLECTION_NAME = 'diaryEntries';
+
+/**
+ * Get user's diary collection reference
+ */
+const getUserDiaryCollection = () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('User not authenticated');
+  return collection(db, 'users', user.uid, COLLECTION_NAME);
+};
+
+/**
+ * Load all diary entries for the current user
+ */
+export const loadDiaryEntries = async (): Promise<SavedEntry[]> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) return [];
+
+    const diaryCollection = getUserDiaryCollection();
+    const q = query(diaryCollection, orderBy('timestamp', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as SavedEntry));
+  } catch (error) {
+    console.error('Error loading diary entries:', error);
+    return [];
+  }
+};
+
+/**
+ * Save a new diary entry
+ */
+export const saveDiaryEntry = async (entry: Omit<SavedEntry, 'id' | 'timestamp'>): Promise<SavedEntry> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+
+    const newEntry: SavedEntry = {
+      ...entry,
+      id: new Date().toISOString() + Math.random(),
+      timestamp: new Date().toISOString(),
+    };
+
+    const diaryCollection = getUserDiaryCollection();
+    const docRef = doc(diaryCollection, newEntry.id);
+    await setDoc(docRef, newEntry);
+
+    return newEntry;
+  } catch (error) {
+    console.error('Error saving diary entry:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update an existing diary entry
+ */
+export const updateDiaryEntry = async (entry: SavedEntry): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+
+    const diaryCollection = getUserDiaryCollection();
+    const docRef = doc(diaryCollection, entry.id);
+    await updateDoc(docRef, { ...entry });
+  } catch (error) {
+    console.error('Error updating diary entry:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a diary entry
+ */
+export const deleteDiaryEntry = async (entryId: string): Promise<void> => {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
+
+    const diaryCollection = getUserDiaryCollection();
+    const docRef = doc(diaryCollection, entryId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Error deleting diary entry:', error);
+    throw error;
+  }
+};
+
+/**
+ * Subscribe to real-time updates of diary entries
+ */
+export const subscribeToDiaryEntries = (
+  onUpdate: (entries: SavedEntry[]) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.warn('No user authenticated for diary subscription');
+      return () => {};
+    }
+
+    const diaryCollection = getUserDiaryCollection();
+    const q = query(diaryCollection, orderBy('timestamp', 'desc'));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot: QuerySnapshot) => {
+        const entries = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as SavedEntry));
+        onUpdate(entries);
+      },
+      (error) => {
+        console.error('Error in diary subscription:', error);
+        if (onError) onError(error);
+      }
+    );
+
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error setting up diary subscription:', error);
+    if (onError) onError(error as Error);
+    return () => {};
+  }
+};
+
+/**
+ * Get count of diary entries
+ */
+export const getDiaryEntryCount = async (): Promise<number> => {
+  try {
+    const entries = await loadDiaryEntries();
+    return entries.length;
+  } catch (error) {
+    console.error('Error getting diary entry count:', error);
+    return 0;
+  }
+};
