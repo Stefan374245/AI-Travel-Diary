@@ -33,6 +33,16 @@ export interface SavedFlashcard extends Flashcard {
   entryId?: string;
   imageUrl?: string;
   location?: string;
+  vocabularyId?: string; // Referenz zur importierten Vokabel-Liste
+}
+
+export interface VocabularyEntry {
+  id: string;
+  es: string;
+  de: string;
+  category: string; // z.B. "Strand", "Natur", "Reisen"
+  timestamp: string;
+  saved: boolean; // Wurde als Flashcard gespeichert
 }
 
 export type LanguageLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
