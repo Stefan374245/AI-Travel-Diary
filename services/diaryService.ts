@@ -1,4 +1,4 @@
-import { db, auth } from './firebase';
+import { db, auth, storage } from './firebase';
 import { 
   collection, 
   doc, 
@@ -13,6 +13,7 @@ import {
   onSnapshot,
   QuerySnapshot
 } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
 import { SavedEntry } from '../types';
 import { moveToTrash } from './trashService';
 
@@ -57,10 +58,19 @@ export const saveDiaryEntry = async (entry: Omit<SavedEntry, 'id' | 'timestamp'>
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
 
+    const entryId = new Date().toISOString() + Math.random();
+    const timestamp = new Date().toISOString();
+
+    // Upload image to Firebase Storage
+    const imageRef = ref(storage, `users/${user.uid}/diary-images/${entryId}.jpg`);
+    await uploadString(imageRef, entry.imagePreview, 'data_url');
+    const imageUrl = await getDownloadURL(imageRef);
+
     const newEntry: SavedEntry = {
       ...entry,
-      id: new Date().toISOString() + Math.random(),
-      timestamp: new Date().toISOString(),
+      imagePreview: imageUrl, // Store the download URL instead of base64
+      id: entryId,
+      timestamp: timestamp,
     };
 
     const diaryCollection = getUserDiaryCollection();
