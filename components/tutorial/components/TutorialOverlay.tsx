@@ -17,9 +17,19 @@ interface SpotlightRect {
 }
 
 const TutorialOverlay: React.FC = () => {
-  const { state, nextStep, prevStep, skipTutorial } = useTutorial();
+  const { state, nextStep, prevStep, skipTutorial, completeTutorial } = useTutorial();
   const [spotlightRect, setSpotlightRect] = useState<SpotlightRect | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+
+  // Handle closing with animation
+  const handleClose = useCallback((closeFunction: () => void) => {
+    setIsClosing(true);
+    setTimeout(() => {
+      closeFunction();
+      setIsClosing(false);
+    }, 300); // Match animation duration
+  }, []);
 
   // Calculate spotlight and tooltip positions
   // Separate function for just updating positions without scrolling
@@ -112,6 +122,15 @@ const TutorialOverlay: React.FC = () => {
 
   if (!state.isActive || !state.currentStep) {
     return null;
+  }
+
+  // Don't render if closing
+  if (isClosing) {
+    return (
+      <div className="tutorial-overlay tutorial-overlay-exit">
+        <div className="tutorial-backdrop tutorial-backdrop-exit"></div>
+      </div>
+    );
   }
 
   const { title, description, tooltipPosition: tooltipPos, targetSelector, showProgress = true } = state.currentStep;
@@ -217,8 +236,13 @@ const TutorialOverlay: React.FC = () => {
         {/* Navigation Buttons */}
         <div className="flex items-center justify-between gap-3">
           <button
-            onClick={skipTutorial}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleClose(skipTutorial);
+            }}
             className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+            type="button"
           >
             Überspringen
           </button>
@@ -226,15 +250,29 @@ const TutorialOverlay: React.FC = () => {
           <div className="flex gap-2">
             {!isFirstStep && (
               <button
-                onClick={prevStep}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  prevStep();
+                }}
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-neutral-200 text-neutral-700 hover:bg-neutral-300 transition-colors"
+                type="button"
               >
                 Zurück
               </button>
             )}
             <button
-              onClick={nextStep}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isLastStep) {
+                  handleClose(completeTutorial);
+                } else {
+                  nextStep();
+                }
+              }}
               className="px-6 py-2 text-sm font-semibold rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-md"
+              type="button"
             >
               {isLastStep ? 'Fertig' : 'Weiter'}
             </button>

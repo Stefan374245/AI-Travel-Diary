@@ -164,10 +164,17 @@
   height: 100vh;
   z-index: 9999;
   pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
 }
 
 .tutorial-overlay-active {
-  pointer-events: auto;
+  pointer-events: none; /* Keep overlay transparent to clicks */
+}
+
+.tutorial-overlay-exit {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Spotlight Backdrop */
@@ -179,6 +186,7 @@
   height: 100%;
   background: rgba(0, 0, 0, 0.75);
   animation: tutorial-spotlight-fade-in 0.3s ease-out;
+  pointer-events: none; /* Don't block clicks on backdrop */
 }
 
 .tutorial-backdrop-exit {

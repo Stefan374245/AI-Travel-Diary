@@ -135,20 +135,26 @@ export const TutorialProvider: React.FC<TutorialProviderProps> = ({
 
   const skipTutorial = useCallback(async () => {
     await tutorialService.markAsSkipped();
-    setState(prev => ({
-      ...prev,
+    setState({
       isActive: false,
+      currentStepIndex: 0,
+      currentStep: null,
+      totalSteps: tutorialSteps.length,
+      hasCompletedTutorial: false,
       isSkipped: true,
-    }));
+    });
   }, []);
 
   const completeTutorial = useCallback(async () => {
     await tutorialService.markAsCompleted();
-    setState(prev => ({
-      ...prev,
+    setState({
       isActive: false,
+      currentStepIndex: 0,
+      currentStep: null,
+      totalSteps: tutorialSteps.length,
       hasCompletedTutorial: true,
-    }));
+      isSkipped: false,
+    });
   }, []);
 
   const restartTutorial = useCallback(async () => {
