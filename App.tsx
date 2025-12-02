@@ -18,6 +18,7 @@ import { useToast } from './contexts/ToastContext';
 import { useAuth } from './contexts/AuthContext';
 import { TutorialProvider, TutorialOverlay } from './components/tutorial';
 import TutorialButton from './components/tutorial/components/TutorialButton';
+import { loadDiaryEntries, saveDiaryEntry, deleteDiaryEntry, updateDiaryEntry, subscribeToDiaryEntries } from './services/diaryService';
 
 
 type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards' | 'legal' | 'help';
@@ -27,52 +28,74 @@ const App: React.FC = () => {
   const [savedEntries, setSavedEntries] = useState<SavedEntry[]>([]);
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [showSignUp, setShowSignUp] = useState(false);
+  const [loading, setLoading] = useState(true);
   const toast = useToast();
   const { currentUser } = useAuth();
 
+  // Load diary entries from Firestore when user logs in
   useEffect(() => {
-    try {
-      const storedEntries = localStorage.getItem('diaryEntries');
-      if (storedEntries) {
-        setSavedEntries(JSON.parse(storedEntries));
+    if (!currentUser) {
+      setSavedEntries([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    
+    // Subscribe to real-time updates
+    const unsubscribe = subscribeToDiaryEntries(
+      (entries) => {
+        setSavedEntries(entries);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error subscribing to diary entries:', error);
+        toast.showToast('Fehler beim Laden der Einträge', 'error');
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Failed to load diary entries from localStorage", error);
-    }
-  }, []);
-
-  const handleSaveEntry = (newEntryData: Omit<SavedEntry, 'id' | 'timestamp'>) => {
-    const newEntry: SavedEntry = {
-      ...newEntryData,
-      id: new Date().toISOString() + Math.random(),
-      timestamp: new Date().toISOString(),
-    };
-    const updatedEntries = [newEntry, ...savedEntries];
-    setSavedEntries(updatedEntries);
-    localStorage.setItem('diaryEntries', JSON.stringify(updatedEntries));
-    setExpandedEntryId(newEntry.id);
-    setActiveTab('diary');
-    // Scroll zum neuen Eintrag nach Tab-Wechsel
-    setTimeout(() => {
-      const element = document.getElementById(`entry-${newEntry.id}`);
-      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
-  };
-
-  const handleDeleteEntry = (id: string) => {
-    if (window.confirm('Möchtest du diesen Eintrag wirklich löschen?')) {
-      const updatedEntries = savedEntries.filter(entry => entry.id !== id);
-      setSavedEntries(updatedEntries);
-      localStorage.setItem('diaryEntries', JSON.stringify(updatedEntries));
-    }
-  };
-
-  const handleUpdateEntry = (updatedEntry: SavedEntry) => {
-    const updatedEntries = savedEntries.map(entry => 
-      entry.id === updatedEntry.id ? updatedEntry : entry
     );
-    setSavedEntries(updatedEntries);
-    localStorage.setItem('diaryEntries', JSON.stringify(updatedEntries));
+
+    return () => unsubscribe();
+  }, [currentUser, toast]);
+
+  const handleSaveEntry = async (newEntryData: Omit<SavedEntry, 'id' | 'timestamp'>) => {
+    try {
+      const newEntry = await saveDiaryEntry(newEntryData);
+      setExpandedEntryId(newEntry.id);
+      setActiveTab('diary');
+      toast.showToast('Eintrag gespeichert', 'success');
+      
+      // Scroll zum neuen Eintrag nach Tab-Wechsel
+      setTimeout(() => {
+        const element = document.getElementById(`entry-${newEntry.id}`);
+        element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    } catch (error) {
+      console.error('Error saving entry:', error);
+      toast.showToast('Fehler beim Speichern des Eintrags', 'error');
+    }
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    if (window.confirm('Möchtest du diesen Eintrag wirklich löschen?')) {
+      try {
+        await deleteDiaryEntry(id);
+        toast.showToast('Eintrag gelöscht', 'success');
+      } catch (error) {
+        console.error('Error deleting entry:', error);
+        toast.showToast('Fehler beim Löschen des Eintrags', 'error');
+      }
+    }
+  };
+
+  const handleUpdateEntry = async (updatedEntry: SavedEntry) => {
+    try {
+      await updateDiaryEntry(updatedEntry);
+      toast.showToast('Eintrag aktualisiert', 'success');
+    } catch (error) {
+      console.error('Error updating entry:', error);
+      toast.showToast('Fehler beim Aktualisieren des Eintrags', 'error');
+    }
   };
 
 
