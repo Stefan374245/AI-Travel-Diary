@@ -18,15 +18,16 @@ import { VocabIcon } from './components/icons/VocabIcon';
 import { SavedEntry } from './types';
 import { useToast } from './contexts/ToastContext';
 import { useAuth } from './contexts/AuthContext';
-import { TutorialProvider, TutorialOverlay } from './components/tutorial';
-import TutorialButton from './components/tutorial/components/TutorialButton';
+import { TutorialProvider, TutorialOverlay, useTutorial } from './components/tutorial';
 import { loadDiaryEntries, saveDiaryEntry, deleteDiaryEntry, updateDiaryEntry, subscribeToDiaryEntries } from './services/diaryService';
 import { subscribeToTrash, restoreFromTrash, permanentDelete, emptyTrash, TrashEntry } from './services/trashService';
 
 
 type Tab = 'analyzer' | 'chat' | 'diary' | 'flashcards' | 'vocabulary' | 'legal' | 'help';
 
-const App: React.FC = () => {
+// Inner component to access tutorial context
+const AppContent: React.FC = () => {
+  const { startTutorial } = useTutorial();
   const [activeTab, setActiveTab] = useState<Tab>('analyzer');
   const [savedEntries, setSavedEntries] = useState<SavedEntry[]>([]);
   const [trashEntries, setTrashEntries] = useState<TrashEntry[]>([]);
@@ -195,26 +196,31 @@ const App: React.FC = () => {
       <button
         data-tutorial={tutorialId}
         onClick={() => setActiveTab(tabName)}
-        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 rounded-md ${
+        className={`flex-1 flex items-center justify-center gap-2 px-2 sm:px-4 py-3 text-sm font-medium transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 rounded-md ${
           activeTab === tabName
             ? 'bg-primary-500 text-white shadow-md'
             : 'bg-white text-neutral-600 hover:bg-neutral-50'
         }`}
       >
         {icon}
-        <span className="hidden sm:inline">{label}</span>
+        <span className="hidden md:inline">{label}</span>
       </button>
     );
   };
 
   return (
-    <TutorialProvider autoStart={true}>
+    <>
       <div className="min-h-screen bg-neutral-50 font-sans text-neutral-800 flex flex-col">
         <header className="bg-white shadow-sm sticky top-0 z-50">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
             <div className="flex items-center justify-between gap-2 sm:gap-4">
               <div className="flex items-center">
-                <TutorialButton />
+                <img 
+                  src="logo.png" 
+                  alt="Travel2Speak Logo" 
+                  className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 lg:h-[100px] lg:w-[100px] cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => currentUser && setActiveTab('analyzer')}
+                />
               </div>
               <div className="flex flex-col items-center flex-1">
                 <h1 
@@ -226,7 +232,10 @@ const App: React.FC = () => {
                 <p className="hidden md:block text-center text-neutral-500 mt-1 text-sm whitespace-nowrap">Dein smarter Begleiter für unvergessliche Reisen & Spanischlernen</p>
               </div>
               <div className="flex items-center">
-                <UserMenu onNavigate={(page) => setActiveTab(page)} />
+                <UserMenu 
+                  onNavigate={(page) => setActiveTab(page)}
+                  onStartTutorial={startTutorial}
+                />
               </div>
             </div>
           </div>
@@ -324,6 +333,14 @@ const App: React.FC = () => {
       </footer>
       </div>
       <TutorialOverlay />
+    </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <TutorialProvider autoStart={true}>
+      <AppContent />
     </TutorialProvider>
   );
 };
