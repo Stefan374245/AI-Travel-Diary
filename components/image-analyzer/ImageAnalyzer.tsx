@@ -320,7 +320,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ onSaveEntry }) => {
                   <Text variant="small" className="block mb-1 text-neutral-600">
                     Stadt oder Adresse suchen
                   </Text>
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex flex-col lg:flex-row gap-2">
                     <input
                       type="text"
                       value={citySearchInput}
