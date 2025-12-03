@@ -4,10 +4,9 @@ import { useToast } from '../../contexts/ToastContext';
 
 interface UserMenuProps {
     onNavigate?: (page: 'legal' | 'help') => void;
-    onStartTutorial?: () => void;
 }
 
-const UserMenu: React.FC<UserMenuProps> = ({ onNavigate, onStartTutorial }) => {
+const UserMenu: React.FC<UserMenuProps> = ({ onNavigate }) => {
     const [isOpen, setIsOpen] = useState(false);
     const { currentUser, logout } = useAuth();
     const { showToast } = useToast();
@@ -45,11 +44,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate, onStartTutorial }) => {
         onNavigate?.(page);
     };
 
-    const handleStartTutorial = () => {
-        setIsOpen(false);
-        onStartTutorial?.();
-    };
-
     // Nur anzeigen wenn eingeloggt
     if (!currentUser) return null;
 
@@ -85,16 +79,6 @@ const UserMenu: React.FC<UserMenuProps> = ({ onNavigate, onStartTutorial }) => {
 
                     {/* Menu Items */}
                     <div className="py-2">
-                        <button
-                            onClick={handleStartTutorial}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors text-left"
-                        >
-                            <svg className="w-5 h-5 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                            </svg>
-                            <span>Tutorial starten</span>
-                        </button>
-
                         <button
                             onClick={() => handleNavigate('help')}
                             className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors text-left"
